@@ -659,3 +659,11 @@ button{color:inherit}
   .action-copy strong{font-size:20px}
   #actionEffect{font-size:14px}
 }
+
+@media(min-width:1024px){
+  .screen-home{
+    background-size:cover;
+    background-position:center center;
+    background-repeat:no-repeat;
+  }
+}
