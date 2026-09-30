@@ -2,6 +2,9 @@ const screens=[...document.querySelectorAll(".screen")];
 const $=s=>document.querySelector(s);
 const ROUND_SECONDS=60;
 const MAX_ROUNDS=10;
+const BASE_DAMAGE=24;
+const BASE_HEAL=22;
+const scaled=(base,multiplier)=>Math.round(base*multiplier);
 
 const state={
   playerName:"",selectedClass:"warrior",roomId:null,round:1,seconds:ROUND_SECONDS,
@@ -19,7 +22,7 @@ const CLASSES={
   mage:{name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴",image:"mage.png"},
   priest:{name:"牧師",specialty:"恢復",ultimate:"神聖回響",image:"priest.png"},
   ranger:{name:"弓手",specialty:"攻擊",ultimate:"穿心連矢",image:"ranger.png"},
-  assassin:{name:"刺客",specialty:"破防",ultimate:"暗影處決",image:"assassin.png"},
+  assassin:{name:"刺客",specialty:"爆發",ultimate:"暗影處決",image:"assassin.png"},
   warlock:{name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉",image:"warlock.png"}
 };
 
@@ -73,7 +76,7 @@ async function renderRooms(){
 }
 
 function makePlayer(id,name,classId,isHuman=false){
-  return {id,name,classId,isHuman,hp:100,maxHp:100,guardCharges:0,vulnerability:0,damage:0,healing:0,ultimates:0,alive:true,submitted:false,submission:null};
+  return {id,name,classId,isHuman,hp:100,maxHp:100,guardCharges:0,effects:[],damage:0,healing:0,ultimates:0,alive:true,submitted:false,submission:null};
 }
 
 function startRoom(id,roomPlayers=null,aiMode=false){
@@ -87,7 +90,7 @@ function startRoom(id,roomPlayers=null,aiMode=false){
       makePlayer("ai-priest","Nora","priest")
     ];
   }else{
-    const src=(roomPlayers||[]).slice(0,4);
+    const src=(roomPlayers||[]).slice(0,6);
     state.players=src.map((p,i)=>makePlayer(p.id||("human-"+i),p.name,p.classId,p.id===state.clientId));
     while(state.players.length<2)state.players.push(makePlayer("guest-"+state.players.length,"等待玩家","warrior"));
     state.players=state.players.filter(p=>p.name!=="等待玩家");
@@ -215,6 +218,7 @@ function escapeHtml(value){
 }
 
 function beginRound(){
+  applyPersistentEffects();
   if(checkBattleEnd())return;
   let setup=null;
   for(let attempt=0;attempt<80&&!setup;attempt++){
@@ -373,6 +377,7 @@ function actionFor(value,classId=state.selectedClass){
   if(!hit)return {id:"invalid",name:"非指定答案"};
   if(hit.id==="ultimate")return {id:"ultimate",name:CLASSES[classId].ultimate};
   if(hit.id==="attack")return {id:"attack",name:classId==="warlock"?"詛咒":"攻擊"};
+  if(hit.id==="heal")return {id:"heal",name:classId==="warlock"?"增益":"恢復"};
   return {id:hit.id,name:ACTION_META[hit.id].label};
 }
 
@@ -546,7 +551,7 @@ async function performAnimatedAction(actor,submission,order){
   targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
   await wait(450);
 
-  const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges,vulnerability:p.vulnerability}]));
+  const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges}]));
   applyAction(actor,submission);
   renderPlayers();
 
@@ -571,52 +576,167 @@ function previewTargets(actor,action){
   if(action==="ultimate"){
     if(actor.classId==="mage")return state.players.filter(p=>p.alive&&p.id!==actor.id);
     if(actor.classId==="warrior"||actor.classId==="priest")return [actor];
-    return [lowestHpEnemy(actor)||highestHpEnemy(actor)].filter(Boolean);
+    if(actor.classId==="warlock")return [highestHpEnemy(actor),actor].filter(Boolean);
+    return [lowestHpEnemy(actor)].filter(Boolean);
   }
+  if(action==="execute"&&actor.classId==="mage")return state.players.filter(p=>p.alive&&p.id!==actor.id);
   if(action==="execute")return [lowestHpEnemy(actor)].filter(Boolean);
   return [highestHpEnemy(actor)].filter(Boolean);
 }
 
 function applyAction(actor,submission){
   const action=submission.action.id;
-  if(action==="ultimate"){applyUltimate(actor);actor.ultimates++;addLog(`${actor.name} · ${CLASSES[actor.classId].ultimate}`);return}
-  if(action==="guard"){actor.guardCharges=1;addLog(`${actor.name} · 抵擋 1 次`);return}
-  if(action==="heal"){
-    const amount=actor.classId==="priest"?30:22;heal(actor,amount);actor.vulnerability=Math.max(0,actor.vulnerability-8);
-    addLog(`${actor.name} · 恢復 ${amount}`);return;
-  }
-  if(action==="attack"){
-    const target=highestHpEnemy(actor);if(!target)return;
-    if(actor.classId==="warlock"){target.vulnerability=Math.min(40,target.vulnerability+12);dealDamage(actor,target,18,"詛咒")}
-    else {let amount=actor.classId==="ranger"?30:24;if(actor.classId==="assassin")target.vulnerability=Math.min(40,target.vulnerability+8);dealDamage(actor,target,amount,"攻擊")}
+
+  if(action==="ultimate"){
+    applyUltimate(actor);
+    actor.ultimates++;
+    addLog(`${actor.name} · ${CLASSES[actor.classId].ultimate}`);
     return;
   }
+
+  if(action==="guard"){
+    actor.guardCharges+=1;
+    addLog(`${actor.name} · 抵擋 1 次`);
+    return;
+  }
+
+  if(action==="heal"){
+    if(actor.classId==="warrior") heal(actor,scaled(BASE_HEAL,1.5));
+    else if(actor.classId==="priest") heal(actor,scaled(BASE_HEAL,2));
+    else if(actor.classId==="warlock"){
+      heal(actor,scaled(BASE_HEAL,.5));
+      addEffect(actor,{type:"hot",remaining:1,amount:scaled(BASE_HEAL,.5),sourceId:actor.id});
+    }else heal(actor,BASE_HEAL);
+    return;
+  }
+
+  if(action==="attack"){
+    const target=highestHpEnemy(actor);
+    if(!target)return;
+    const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:1}[actor.classId]??1;
+    dealDamage(actor,target,scaled(BASE_DAMAGE,mult),actor.classId==="warlock"?"詛咒":"攻擊");
+    if(actor.classId==="warlock"&&target.alive){
+      addEffect(target,{type:"dot",remaining:1,amount:BASE_DAMAGE,sourceId:actor.id});
+    }
+    return;
+  }
+
   if(action==="execute"){
-    const target=lowestHpEnemy(actor);if(!target)return;
-    let amount=target.hp<=35?38:28;if(actor.classId==="assassin")amount+=6;dealDamage(actor,target,amount,"尾刀");
+    if(actor.classId==="mage"){
+      const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
+      const lowest=[...enemies].sort((a,b)=>a.hp-b.hp)[0];
+      enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===lowest?.id?1.5:1),"尾刀",false));
+      return;
+    }
+    const target=lowestHpEnemy(actor);
+    if(!target)return;
+    const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
+    dealDamage(actor,target,scaled(BASE_DAMAGE,mult),"尾刀");
   }
 }
 
 function applyUltimate(actor){
   const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
-  if(actor.classId==="warrior"){actor.guardCharges=2;actor.vulnerability=Math.max(0,actor.vulnerability-15)}
-  if(actor.classId==="mage")enemies.forEach(t=>dealDamage(actor,t,26,"元素風暴",false));
-  if(actor.classId==="priest"){heal(actor,48);actor.guardCharges=1}
-  if(actor.classId==="ranger"){const t=lowestHpEnemy(actor);if(t){dealDamage(actor,t,22,"連矢",false);if(t.alive)dealDamage(actor,t,22,"連矢",false);if(t.alive)dealDamage(actor,t,22,"連矢",false)}}
-  if(actor.classId==="assassin"){const t=lowestHpEnemy(actor);if(t){t.guardCharges=0;t.vulnerability=Math.min(40,t.vulnerability+20);dealDamage(actor,t,44,"暗影處決",false)}}
-  if(actor.classId==="warlock"){const t=highestHpEnemy(actor);if(t){t.vulnerability=Math.min(40,t.vulnerability+18);dealDamage(actor,t,30,"命運逆轉",false);actor.guardCharges=1}}
+
+  if(actor.classId==="warrior"){
+    actor.guardCharges+=2;
+    return;
+  }
+
+  if(actor.classId==="mage"){
+    const highest=[...enemies].sort((a,b)=>b.hp-a.hp)[0];
+    enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.5:1),"元素風暴",false));
+    return;
+  }
+
+  if(actor.classId==="priest"){
+    heal(actor,scaled(BASE_HEAL,2.5));
+    actor.guardCharges+=1;
+    return;
+  }
+
+  if(actor.classId==="ranger"){
+    const target=lowestHpEnemy(actor);
+    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,3),"穿心連矢",false);
+    return;
+  }
+
+  if(actor.classId==="assassin"){
+    const target=lowestHpEnemy(actor);
+    if(target){
+      target.guardCharges=0;
+      dealDamage(actor,target,scaled(BASE_DAMAGE,2.5),"暗影處決",false);
+    }
+    return;
+  }
+
+  if(actor.classId==="warlock"){
+    const target=highestHpEnemy(actor);
+    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,2),"命運逆轉",false);
+    heal(actor,scaled(BASE_HEAL,.5));
+  }
 }
 
-function heal(p,amount){if(!p.alive)return;const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);p.healing+=p.hp-before}
+function addEffect(target,effect){
+  target.effects=target.effects||[];
+  target.effects.push(effect);
+}
+
+function applyPersistentEffects(){
+  const pending=[];
+  for(const target of state.players){
+    if(!target.alive||!target.effects?.length)continue;
+    for(const effect of target.effects){
+      if(effect.remaining<=0)continue;
+      if(effect.type==="dot"){
+        const source=state.players.find(p=>p.id===effect.sourceId)||target;
+        const dealt=dealDamage(source,target,effect.amount,"詛咒",false);
+        if(dealt>0)pending.push(`${target.name} 詛咒 -${dealt}`);
+      }else if(effect.type==="hot"){
+        const source=state.players.find(p=>p.id===effect.sourceId)||target;
+        const before=target.hp;
+        heal(target,effect.amount,source);
+        const gained=target.hp-before;
+        if(gained>0)pending.push(`${target.name} 增益 +${gained}`);
+      }
+      effect.remaining--;
+    }
+    target.effects=target.effects.filter(e=>e.remaining>0);
+  }
+  pending.forEach(addLog);
+  renderPlayers();
+}
+
+function heal(p,amount,source=p){
+  if(!p.alive)return 0;
+  const before=p.hp;
+  p.hp=Math.min(p.maxHp,p.hp+amount);
+  const gained=p.hp-before;
+  source.healing+=gained;
+  return gained;
+}
+
 function dealDamage(actor,target,raw,label,log=true){
   if(!target?.alive)return 0;
-  if(target.guardCharges>0){target.guardCharges--;if(log)addLog(`${target.name} 抵擋了 ${label}`);return 0}
-  const amount=Math.max(1,Math.round(raw*(1+Math.min(40,target.vulnerability)/100)));
-  const dealt=Math.min(target.hp,amount);target.hp-=dealt;actor.damage+=dealt;
+  if(target.guardCharges>0){
+    target.guardCharges--;
+    if(log)addLog(`${target.name} 抵擋了 ${label}`);
+    return 0;
+  }
+  const amount=Math.max(1,Math.round(raw));
+  const dealt=Math.min(target.hp,amount);
+  target.hp-=dealt;
+  actor.damage+=dealt;
   if(log)addLog(`${actor.name} ${label} ${target.name} · ${dealt}`);
-  if(target.hp<=0){target.hp=0;target.alive=false;target.guardCharges=0;addLog(`${target.name} 淘汰`)}
+  if(target.hp<=0){
+    target.hp=0;
+    target.alive=false;
+    target.guardCharges=0;
+    addLog(`${target.name} 淘汰`);
+  }
   return dealt;
 }
+
 function highestHpEnemy(actor){return state.players.filter(p=>p.alive&&p.id!==actor.id).sort((a,b)=>b.hp-a.hp)[0]||null}
 function lowestHpEnemy(actor){return state.players.filter(p=>p.alive&&p.id!==actor.id).sort((a,b)=>a.hp-b.hp)[0]||null}
 
@@ -638,14 +758,13 @@ function buildEffectSummary(actor,action,before){
     const prev=before.get(p.id);if(!prev)continue;
     const hpDiff=p.hp-prev.hp;
     const guardDiff=p.guardCharges-prev.guard;
-    const vulnDiff=p.vulnerability-prev.vulnerability;
     if(hpDiff<0)parts.push(`${p.name} 傷害 ${-hpDiff}`);
     if(hpDiff>0)parts.push(`${p.name} 恢復 +${hpDiff}`);
     if(guardDiff>0)parts.push(`${p.name} 抵擋 +${guardDiff}`);
     if(guardDiff<0&&hpDiff===0)parts.push(`${p.name} 抵擋成功`);
-    if(vulnDiff>0)parts.push(`${p.name} ${actor.classId==="warlock"?"詛咒":"破防"} +${vulnDiff}%`);
-    if(vulnDiff<0)parts.push(`${p.name} 增益 淨化 ${-vulnDiff}%`);
   }
+  if(actor.classId==="warlock"&&action==="attack")parts.push("詛咒持續 2 回合");
+  if(actor.classId==="warlock"&&action==="heal")parts.push("增益持續 2 回合");
   return parts.join("｜")||ACTION_META[action]?.label||"";
 }
 async function showUltimateOverlay(){
