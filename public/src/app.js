@@ -232,7 +232,7 @@ async function playServerEvents(battle){
   }
 
   state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
-  renderPlayers();hideActionStage();
+  renderPlayers();renderTargets();hideActionStage();
   state.playingServerEvents=false;
 }
 
@@ -412,8 +412,10 @@ function randomSharedCards(){
 }
 
 function renderTargets(){
+  const me=state.players.find(p=>p.isHuman);
+  const ultimateLocked=(me?.ultimates||0)>=2;
   $("#actionBands").innerHTML=state.targets.map(t=>`
-    <div class="target-chip" data-action="${t.id}">
+    <div class="target-chip ${t.id==="ultimate"&&ultimateLocked?"disabled":""}" data-action="${t.id}">
       <img class="action-icon" src="./assets/images/${ACTION_META[t.id].image}" alt="">
       <span>${ACTION_META[t.id].label}</span><strong>${t.value}</strong>
     </div>`).join("");
@@ -522,18 +524,22 @@ function evaluateFormula(formula){
   try{const v=Function(`"use strict";return (${safe})`)();return Number.isFinite(v)?Math.round(v*100)/100:null}catch{return null}
 }
 
-function actionFor(value,classId=state.selectedClass){
+function actionFor(value,classId=state.selectedClass,player=null){
   if(value===null)return {id:"invalid",name:""};
   const hit=state.targets.find(t=>Math.abs(t.value-value)<0.0001);
   if(!hit)return {id:"invalid",name:"非指定答案"};
-  if(hit.id==="ultimate")return {id:"ultimate",name:CLASSES[classId].ultimate};
+  if(hit.id==="ultimate"){
+    if((player?.ultimates||0)>=2)return {id:"invalid",name:"絕招已用完"};
+    return {id:"ultimate",name:CLASSES[classId].ultimate};
+  }
   if(hit.id==="attack")return {id:"attack",name:classId==="warlock"?"詛咒":"攻擊"};
   if(hit.id==="heal")return {id:"heal",name:classId==="warlock"?"增益":"恢復"};
   return {id:hit.id,name:ACTION_META[hit.id].label};
 }
 
 function updateFormula(){
-  const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value);
+  const me=state.players.find(p=>p.isHuman);
+  const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value,me?.classId||state.selectedClass,me);
   const answer=$("#answerDisplay");
   if(answer){
     answer.textContent=value===null?"—":String(value);
@@ -625,7 +631,7 @@ function resetFormula(){
 async function submitAnswer(){
   if(state.submitted||state.roundLocked)return;
   const human=state.players.find(p=>p.isHuman);if(!human?.alive)return;
-  const formula=formulaString(),result=evaluateFormula(formula),action=actionFor(result,human.classId);
+  const formula=formulaString(),result=evaluateFormula(formula),action=actionFor(result,human.classId,human);
   if(result===null)return;
 
   if(state.roomMode==="human"){
@@ -672,19 +678,21 @@ function scheduleBots(){
     const delay=7000+Math.floor(Math.random()*38000)+i*500;
     setTimeout(()=>{
       if(state.roundLocked||!bot.alive||bot.submitted)return;
-      const choice=findBotFormula(bot.classId);
+      const choice=findBotFormula(bot);
       bot.submitted=true;bot.submission=choice?{...choice,at:Date.now(),elapsed:Math.round(delay/1000)}:{forfeit:true,at:Date.now()};
       addLog(`${bot.name} ${choice?"完成":"放棄"}`);renderPlayers();finalizeRoundWhenReady(false);
     },delay);
   });
 }
 
-function findBotFormula(classId){
-  const weighted=["ultimate","execute","attack","heal","guard"];
+function findBotFormula(bot){
+  const weighted=(bot.ultimates||0)>=2
+    ?["execute","attack","heal","guard"]
+    :["ultimate","execute","attack","heal","guard"];
   const id=weighted[Math.floor(Math.random()*weighted.length)];
   const solution=state.solutions[id]||state.solutions.attack;
   if(!solution)return null;
-  return {forfeit:false,formula:solution.formula,result:solution.value,action:actionFor(solution.value,classId)};
+  return {forfeit:false,formula:solution.formula,result:solution.value,action:actionFor(solution.value,bot.classId,bot)};
 }
 
 function finalizeRoundWhenReady(force){
@@ -773,6 +781,7 @@ function applyAction(actor,submission){
   const action=submission.action.id;
 
   if(action==="ultimate"){
+    if((actor.ultimates||0)>=2)return;
     applyUltimate(actor);
     actor.ultimates++;
     addLog(`${actor.name} · ${CLASSES[actor.classId].ultimate}`);
@@ -843,6 +852,7 @@ function applyUltimate(actor){
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(actor);
     if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,3),"穿心連矢",false);
+    heal(actor,scaled(BASE_HEAL,.5));
     return;
   }
 
