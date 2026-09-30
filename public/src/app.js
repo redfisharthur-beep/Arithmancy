@@ -46,20 +46,20 @@ syncOrientationGate();
 
 
 const CLASSES={
-  warrior:{name:"戰士",specialty:"防禦",ultimate:"絕對壁壘"},
-  mage:{name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴"},
-  priest:{name:"牧師",specialty:"恢復",ultimate:"神聖回響"},
-  ranger:{name:"弓手",specialty:"攻擊",ultimate:"穿心連矢"},
-  assassin:{name:"刺客",specialty:"破防",ultimate:"暗影處決"},
-  warlock:{name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉"}
+  warrior:{name:"戰士",specialty:"防禦",ultimate:"絕對壁壘",image:"warrior.png"},
+  mage:{name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴",image:"mage.png"},
+  priest:{name:"牧師",specialty:"恢復",ultimate:"神聖回響",image:"priest.png"},
+  ranger:{name:"弓手",specialty:"攻擊",ultimate:"穿心連矢",image:"ranger.png"},
+  assassin:{name:"刺客",specialty:"破防",ultimate:"暗影處決",image:"assassin.png"},
+  warlock:{name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉",image:"warlock.png"}
 };
 
 const ACTION_META={
-  ultimate:{label:"絕招",icon:"✦"},
-  attack:{label:"攻擊／詛咒",icon:"⚔"},
-  guard:{label:"抵擋",icon:"◆"},
-  heal:{label:"恢復／增益",icon:"＋"},
-  execute:{label:"尾刀",icon:"⌁"}
+  ultimate:{label:"絕招",image:"skill-ultimate.png"},
+  attack:{label:"攻擊／詛咒",image:"skill-attack.png"},
+  guard:{label:"抵擋",image:"skill-guard.png"},
+  heal:{label:"恢復／增益",image:"skill-heal.png"},
+  execute:{label:"尾刀",image:"skill-execute.png"}
 };
 
 const AI_ROOM={id:"AI-001",owner:"AI 訓練房",players:4,max:4,ai:true};
@@ -69,7 +69,8 @@ function showScreen(name){screens.forEach(s=>s.classList.toggle("active",s.datas
 function renderClasses(){
   $("#classGrid").innerHTML=Object.entries(CLASSES).map(([id,c])=>`
     <button class="class-card ${state.selectedClass===id?"selected":""}" data-class="${id}">
-      <strong>${c.name}</strong><span>${c.specialty}</span><small>${c.ultimate}</small>
+      <img class="class-art" src="./assets/images/${c.image}" alt="${c.name}">
+      <span class="class-info"><strong>${c.name}</strong><span>${c.specialty}</span><small>${c.ultimate}</small></span>
     </button>`).join("");
   document.querySelectorAll(".class-card").forEach(btn=>btn.onclick=()=>{state.selectedClass=btn.dataset.class;renderClasses()});
 }
@@ -210,6 +211,7 @@ function renderWaitingRoom(){
   $("#waitingPlayers").innerHTML=room.players.map((p,i)=>`
     <div class="waiting-player">
       <span class="seat-no">${i+1}</span>
+      <img class="waiting-avatar" src="./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}" alt="">
       <div><strong>${escapeHtml(p.name)}</strong><small>${CLASSES[p.classId]?.name||"玩家"}</small></div>
       <span class="host-tag">${p.id===room.ownerId?"HOST":""}</span>
     </div>`).join("")+
@@ -291,6 +293,7 @@ function randomSharedCards(){
 function renderTargets(){
   $("#actionBands").innerHTML=state.targets.map(t=>`
     <div class="target-chip" data-action="${t.id}">
+      <img class="action-icon" src="./assets/images/${ACTION_META[t.id].image}" alt="">
       <span>${ACTION_META[t.id].label}</span><strong>${t.value}</strong>
     </div>`).join("");
 }
@@ -299,6 +302,7 @@ function renderPlayers(){
   $("#playersStrip").innerHTML=state.players.map(p=>{
     const hpPct=Math.max(0,p.hp/p.maxHp*100);
     return `<div class="player-chip ${!p.alive?"dead":""} ${p.isHuman?"self":""}" data-player-id="${p.id}">
+      <img class="player-avatar" src="./assets/images/${CLASSES[p.classId].image}" alt="${CLASSES[p.classId].name}">
       <div class="topline"><span>${p.name} · ${CLASSES[p.classId].name}</span><span>${Math.max(0,p.hp)}</span></div>
       <div class="hpbar"><i style="width:${hpPct}%"></i></div>
       <div class="statusline"><span>${p.guardCharges?"抵擋 ×"+p.guardCharges:""}</span><span>${p.vulnerability?"破防 "+p.vulnerability+"%":""}</span><span>${p.submitted?"已送出":p.alive?"思考中":"淘汰"}</span></div>
@@ -661,7 +665,7 @@ function showResults(){
   $("#winnerName").textContent=rows[0]?.name||"";
   $("#ranking").innerHTML=`
     <div class="rank-row header"><span>#</span><span>玩家</span><span>傷害</span><span>恢復</span><span>絕招</span></div>
-    ${rows.map((r,i)=>`<div class="rank-row"><strong>${i+1}</strong><span>${r.name} · ${CLASSES[r.classId].name}</span><span>${r.damage}</span><span>${r.healing}</span><span>${r.ultimates}</span></div>`).join("")}`;
+    ${rows.map((r,i)=>`<div class="rank-row"><strong>${i+1}</strong><span class="rank-player"><img class="rank-avatar" src="./assets/images/${CLASSES[r.classId].image}" alt=""><span>${r.name} · ${CLASSES[r.classId].name}</span></span><span>${r.damage}</span><span>${r.healing}</span><span>${r.ultimates}</span></div>`).join("")}`;
   $("#submitBtn").style.opacity="1";showScreen("results");
 }
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
