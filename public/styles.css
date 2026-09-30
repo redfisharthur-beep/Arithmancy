@@ -22,3 +22,80 @@
 @media(max-width:800px){.screen{padding:12px}.lobby-panel{grid-template-columns:1fr;padding:18px}.class-grid{grid-template-columns:repeat(2,1fr)}.battle-top{grid-template-columns:66px 1fr}.round-timer{height:78px}.round-timer strong{font-size:30px}.conditions{padding:7px}.action-bands{grid-template-columns:repeat(5,minmax(52px,1fr));gap:4px}.target-chip{padding:6px 5px;display:block;text-align:center}.target-chip span{display:block;font-size:9px;overflow:hidden;text-overflow:ellipsis}.target-chip strong{font-size:18px}.players-strip{grid-template-columns:repeat(2,1fr)}.formula-zone{min-height:370px;padding:16px}.battle-log{position:static;width:100%;min-height:38px;text-align:center}.cards-row{gap:8px}.card{width:58px;height:86px;border-radius:14px;font-size:29px}.card.paren-start:before,.card.paren-end:after{font-size:38px}.action-stage strong{font-size:30px}.control-image{width:94px}.control-image.primary{width:120px}.rank-row{grid-template-columns:34px 1.3fr .8fr .8fr .8fr;font-size:11px;padding:10px 6px}}
 
 .waiting-panel{max-width:620px;padding:24px}.waiting-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--line)}.waiting-head div{display:flex;align-items:baseline;gap:10px}.waiting-head span{font-size:11px;color:var(--muted);letter-spacing:2px}.waiting-head strong{font-size:24px;font-weight:500;color:#e5d6a3}.waiting-players{display:grid;gap:10px;margin:18px 0}.waiting-player{min-height:64px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03);display:grid;grid-template-columns:36px 1fr 56px;align-items:center;padding:10px 14px}.waiting-player.empty{display:flex;justify-content:center;color:var(--muted);font-size:12px;border-style:dashed}.seat-no{color:var(--muted);font-size:12px}.waiting-player strong{display:block;font-size:15px;font-weight:500}.waiting-player small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.host-tag{font-size:9px;letter-spacing:1px;color:#d8c98d;text-align:right}.waiting-footer{display:flex;flex-direction:column;align-items:center;gap:12px}.waiting-footer>span{font-size:12px;color:var(--muted)}.waiting-footer .fight-button{width:170px}.soft-button.compact{min-height:38px;padding:0 18px}.room-empty,.room-loading{padding:16px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:12px}.room-item.ai-room{border-color:rgba(215,191,121,.34)}
+
+/* Landscape-first mobile/tablet game shell */
+html,body{width:100%;height:100%;min-height:100%;overflow:hidden;background:#080b08;overscroll-behavior:none}
+body{touch-action:manipulation}
+.game-viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#080b08;overflow:hidden}
+.game-stage{position:relative;width:100vw;height:100vh;overflow:hidden;transform-origin:center center}
+#app{position:absolute;inset:0;width:100%;height:100%}
+.screen{min-height:100%;height:100%;overflow:hidden}
+.orientation-gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#0b0f0c;z-index:99999;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));text-align:center}
+.orientation-gate.show{display:flex}
+.rotate-card{display:flex;flex-direction:column;align-items:center;gap:10px;color:#ece6d2}
+.rotate-card strong{font-size:20px;font-weight:500}
+.rotate-card small{font-size:12px;color:var(--muted);letter-spacing:1px}
+.rotate-icon{width:88px;height:56px;border:2px solid #cbb875;border-radius:12px;position:relative;margin-bottom:8px;transform:rotate(90deg);animation:rotateHint 1.8s ease-in-out infinite}
+.rotate-icon:after{content:"";position:absolute;width:14px;height:3px;border-radius:3px;background:#cbb875;left:50%;bottom:5px;transform:translateX(-50%)}
+@keyframes rotateHint{0%,20%{transform:rotate(90deg)}65%,100%{transform:rotate(0deg)}}
+
+/* 16:9 landscape compaction for phones and tablets */
+@media (pointer:coarse) and (orientation:landscape){
+  .screen{padding:clamp(8px,1.2vh,14px)}
+  .battle-shell{width:100%;height:100%;margin:0;gap:clamp(6px,1vh,10px)}
+  .battle-top{grid-template-columns:clamp(58px,7vw,80px) 1fr;gap:8px}
+  .round-timer{height:clamp(58px,11vh,78px);border-radius:14px}
+  .round-timer strong{font-size:clamp(24px,5vh,34px)}
+  .conditions{padding:6px 8px;border-radius:14px}
+  .action-bands{gap:5px}
+  .target-chip{padding:5px 7px;border-radius:11px}
+  .target-chip span{font-size:clamp(8px,1.6vw,11px)}
+  .target-chip strong{font-size:clamp(16px,3.5vh,22px)}
+  .players-strip{grid-template-columns:repeat(4,1fr);gap:6px}
+  .player-chip{padding:7px 9px;border-radius:11px}
+  .player-chip .topline{font-size:clamp(9px,1.6vw,12px)}
+  .statusline{font-size:clamp(7px,1.25vw,9px);margin-top:4px}
+  .hpbar{margin-top:5px}
+  .formula-zone{min-height:0;flex:1;padding:8px 14px;gap:8px;border-radius:18px}
+  .battle-log{left:10px;top:8px;width:190px;font-size:8px}
+  .formula-preview{min-height:44px}
+  .formula-preview #formulaText{font-size:clamp(13px,2.2vw,17px)}
+  .formula-preview #formulaResult{font-size:clamp(24px,5vh,34px)}
+  .formula-preview #matchedAction{font-size:10px}
+  .cards-row{gap:8px;flex-wrap:nowrap}
+  .card{width:clamp(52px,7.2vw,74px);height:clamp(72px,15vh,98px);border-radius:13px;font-size:clamp(26px,6vh,36px)}
+  .card.paren-start:before,.card.paren-end:after{font-size:clamp(32px,7vh,44px)}
+  .paren-hint{min-height:14px;font-size:9px}
+  .battle-controls{gap:8px}
+  .control-image{width:clamp(84px,12vw,112px)}
+  .control-image.primary{width:clamp(108px,15vw,142px)}
+  .lobby-panel{width:min(1180px,97%);height:min(90%,610px);grid-template-columns:1.15fr .85fr;gap:14px;padding:14px;overflow:hidden}
+  .class-grid{grid-template-columns:repeat(3,1fr);gap:8px}
+  .class-card{min-height:0;height:clamp(92px,19vh,128px);padding:10px;border-radius:12px}
+  .class-card strong{font-size:clamp(14px,2.2vw,18px)}
+  .class-card span,.class-card small{font-size:clamp(8px,1.3vw,10px)}
+  .room-list{gap:6px;overflow:auto}
+  .room-item{padding:8px 10px;border-radius:11px;font-size:clamp(10px,1.5vw,12px)}
+  .soft-button{min-height:38px}
+  .waiting-panel{width:min(680px,92%);max-height:88%;padding:14px;overflow:auto}
+  .waiting-player{min-height:46px;padding:7px 10px}
+  .waiting-players{gap:6px;margin:10px 0}
+  .waiting-footer{gap:7px}
+  .results-panel{max-width:760px;max-height:88%;overflow:auto;padding:18px}
+  .rank-row{padding:8px 10px}
+  .home-center{width:min(420px,54vw);gap:14px}
+  .name-input{height:clamp(44px,9vh,56px)}
+  .fight-button{width:clamp(150px,23vw,190px)}
+}
+
+@media (pointer:coarse) and (orientation:portrait){
+  .game-viewport{visibility:hidden}
+  .orientation-gate{display:flex}
+}
+
+@media (pointer:coarse) and (orientation:landscape) and (max-height:520px){
+  .battle-log{display:none}
+  .formula-zone{padding-top:5px;padding-bottom:5px}
+  .player-chip{padding-top:5px;padding-bottom:5px}
+  .statusline{min-height:10px}
+}
