@@ -115,9 +115,23 @@ function startRoom(id){
 
 function beginRound(){
   if(checkBattleEnd())return;
-  state.cards=randomSharedCards();
-  state.originalCards=state.cards.map(c=>({...c}));
-  const ultimate=pickReachableUltimate(state.originalCards);
+  let ultimate=null;
+  for(let attempt=0;attempt<40&&!ultimate;attempt++){
+    state.cards=randomSharedCards();
+    state.originalCards=state.cards.map(c=>({...c}));
+    ultimate=pickReachableUltimate(state.originalCards);
+  }
+  if(!ultimate){
+    state.cards=[
+      {id:"fallback-1",value:"6",type:"number"},
+      {id:"fallback-2",value:"+",type:"op"},
+      {id:"fallback-3",value:"3",type:"number"},
+      {id:"fallback-4",value:"×",type:"op"},
+      {id:"fallback-5",value:"2",type:"number"}
+    ];
+    state.originalCards=state.cards.map(c=>({...c}));
+    ultimate={target:18,formula:"(6 + 3) × 2"};
+  }
   state.ultimateTarget=ultimate.target;
   state.ultimateSolution=ultimate.formula;
   state.parenRange=null;
@@ -429,10 +443,14 @@ function allReachableFormulas(cards){
 
 function pickReachableUltimate(cards){
   const all=allReachableFormulas(cards);
-  const integers=all.filter(x=>Number.isInteger(x.value)&&x.value>=10&&x.value<=60);
-  const parenthesized=integers.filter(x=>x.usesParen);
-  const pool=parenthesized.length?parenthesized:(integers.length?integers:all.filter(x=>Number.isInteger(x.value)&&x.value>0));
-  const choice=pool[Math.floor(Math.random()*pool.length)]||all[0]||{formula:"",value:0};
+  const positiveIntegers=all.filter(x=>Number.isInteger(x.value)&&x.value>0&&x.value<=99);
+  if(!positiveIntegers.length)return null;
+
+  const preferred=positiveIntegers.filter(x=>x.value>=10&&x.value<=60&&x.usesParen);
+  const normal=positiveIntegers.filter(x=>x.value>=10&&x.value<=60);
+  const pool=preferred.length?preferred:(normal.length?normal:positiveIntegers);
+  const choice=pool[Math.floor(Math.random()*pool.length)];
+
   console.debug("[Arithmancy] reachable ultimate",choice.value,choice.formula);
   return {target:choice.value,formula:choice.formula};
 }
