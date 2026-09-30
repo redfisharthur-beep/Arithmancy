@@ -288,7 +288,7 @@ function resolveRound(battle){
 
 function applyAction(battle,actor,action){
   if(action==="guard"){
-    actor.guardCharges+=1;return [actor.id];
+    actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
   }
   if(action==="heal"){
     if(actor.classId==="warrior")heal(actor,scaled(BASE_HEAL,1.5),actor);
@@ -313,13 +313,26 @@ function applyAction(battle,actor,action){
     if(actor.classId==="mage"){
       const enemies=battle.players.filter(p=>p.alive&&p.id!==actor.id);
       const lowest=randomTied(enemies,p=>p.hp,"min");
-      for(const t of enemies)dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===lowest?.id?1.2:.6));
+      for(const t of enemies){
+        const mult=t.id===lowest?.id?1.2:.6;
+        if((t.guardCharges||0)>0){
+          t.guardCharges=0;
+          dealDamage(actor,t,scaled(BASE_DAMAGE,mult*.5),{ignoreGuard:true});
+        }else{
+          dealDamage(actor,t,scaled(BASE_DAMAGE,mult));
+        }
+      }
       return enemies.map(p=>p.id);
     }
     const target=lowestHpEnemy(battle,actor);
     if(!target)return [];
     const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
-    dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
+    if((target.guardCharges||0)>0){
+      target.guardCharges=0;
+      dealDamage(actor,target,scaled(BASE_DAMAGE,mult*.5),{ignoreGuard:true});
+    }else{
+      dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
+    }
     return [target.id];
   }
   if(action==="ultimate"){
@@ -389,9 +402,9 @@ function heal(target,amount,source){
   return gained;
 }
 
-function dealDamage(actor,target,amount){
+function dealDamage(actor,target,amount,options={}){
   if(!target?.alive)return 0;
-  if(target.guardCharges>0){target.guardCharges--;return 0}
+  if(!options.ignoreGuard&&target.guardCharges>0){target.guardCharges--;return 0}
   const dealt=Math.min(target.hp,Math.max(1,Math.round(amount)));
   target.hp-=dealt;
   actor.damage+=dealt;
