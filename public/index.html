@@ -19,6 +19,21 @@
     <div class="lobby-actions"><button id="createRoomBtn" class="soft-button">建立房間</button><div class="room-list" id="roomList"></div></div>
   </div></section>
 
+  <section class="screen screen-waiting" data-screen="waiting">
+    <div class="panel waiting-panel">
+      <div class="waiting-head">
+        <div><span>ROOM</span><strong id="waitingRoomCode">R-0000</strong></div>
+        <span id="waitingCount">1/4</span>
+      </div>
+      <div id="waitingPlayers" class="waiting-players"></div>
+      <div class="waiting-footer">
+        <span id="waitingHint">等朋友加入後開始</span>
+        <button id="waitingFightBtn" class="image-button fight-button" aria-label="Fight"><img src="./assets/images/buttons/fight.svg" alt="Fight"></button>
+        <button id="leaveRoomBtn" class="soft-button compact">離開房間</button>
+      </div>
+    </div>
+  </section>
+
   <section class="screen screen-battle" data-screen="battle"><div class="battle-shell">
     <header class="battle-top">
       <div class="round-timer"><span id="roundLabel">Q1/10</span><strong id="timer">60</strong></div>
