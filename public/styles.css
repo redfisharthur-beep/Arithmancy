@@ -36,7 +36,10 @@ button{color:inherit}
   background-image:none;
   background-color:#8f978d;
 }
-.screen-results{background-image:url("./assets/images/results-bg.png")}
+.screen-results{
+  background-image:none;
+  background-color:#8f978d;
+}
 
 .home-center{
   width:min(420px,88vw);
@@ -498,9 +501,9 @@ button{color:inherit}
 .rank-row.header{color:var(--muted)}
 .rank-player{display:flex;align-items:center;gap:6px;min-width:0}
 .rank-avatar{
-  width:34px;
-  height:34px;
-  border-radius:7px;
+  width:58px;
+  height:58px;
+  border-radius:10px;
   object-fit:contain;
   object-position:center;
 }
@@ -561,6 +564,7 @@ button{color:inherit}
   .battle-top{grid-auto-rows:102px}
   .target-chip .action-icon{width:70px;height:70px}
   .target-chip strong{font-size:27px}
+  .rank-avatar{width:72px;height:72px}
   .formula-zone{min-height:310px}
   .battle-controls{
     left:50%;
