@@ -240,6 +240,9 @@ function beginRound(){
   state.parenRange=null;state.parenSelection=[];state.parenMode=false;
   state.submitted=false;state.queue=[];state.roundLocked=false;
   state.players.filter(p=>p.alive).forEach(p=>{p.submitted=false;p.submission=null});
+  $("#submitBtn").disabled=false;
+  $("#submitBtn").classList.remove("submitted");
+  $("#answerDisplay")?.classList.remove("submitted");
   $("#roundLabel").textContent=`Q${state.round}/${MAX_ROUNDS}`;
   renderTargets();renderPlayers();renderCards();updateFormula();renderLog();hideActionStage();
   startTimer();scheduleBots();
@@ -327,20 +330,20 @@ function selectParen(index){
   if(!state.parenMode||state.submitted||state.roundLocked)return;
   const types=["number","op","number"],step=state.parenSelection.length;
   if(step===0){
-    if(state.cards[index].type!=="number")return flashHint("先選數字");
+    if(state.cards[index].type!=="number")return;
     state.parenSelection=[index];
   }else{
     const prev=state.parenSelection.at(-1);
-    if(Math.abs(index-prev)!==1)return flashHint("只能選相鄰卡牌");
-    if(state.cards[index].type!==types[step])return flashHint(step===1?"再選符號":"再選數字");
+    if(Math.abs(index-prev)!==1)return;
+    if(state.cards[index].type!==types[step])return;
     const direction=step===1?Math.sign(index-prev):Math.sign(state.parenSelection[1]-state.parenSelection[0]);
-    if(step===2&&index!==prev+direction)return flashHint("請沿同一方向選取");
+    if(step===2&&index!==prev+direction)return;
     state.parenSelection.push(index);
   }
   if(state.parenSelection.length===3){
     const x=[...state.parenSelection].sort((a,b)=>a-b);
     state.parenRange=[x[0],x[2]];state.parenSelection=[];state.parenMode=false;
-    $("#parenBtn").classList.remove("active");flashHint("括號完成");
+    $("#parenBtn").classList.remove("active");
   }
   renderCards();updateFormula();
 }
@@ -470,6 +473,9 @@ function submitAnswer(){
   if(result===null)return flashHint("算式尚未完成");
   state.submitted=true;human.submitted=true;
   human.submission={forfeit:false,formula,result,action,at:Date.now(),elapsed:ROUND_SECONDS-state.seconds};
+  $("#answerDisplay")?.classList.add("submitted");
+  $("#submitBtn").disabled=true;
+  $("#submitBtn").classList.add("submitted");
   addLog(`${human.name} 完成 · ${human.submission.elapsed}s`);renderPlayers();updateFormula();
   finalizeRoundWhenReady(false);
 }
@@ -506,7 +512,16 @@ function finalizeRoundWhenReady(force){
 
 async function resolveQueue(){
   showActionStage();
-  if(!state.queue.length){showSkillBanner("本題無人行動","");await wait(1600)}
+  if(!state.queue.length){
+    showActionStage();
+    $("#actionClassImage").removeAttribute("src");
+    $("#actionActor").textContent="";
+    $("#actionSkill").textContent="本題無人行動";
+    $("#actionTarget").textContent="";
+    $("#actionEffect").textContent="";
+    $("#actionMainIcon").removeAttribute("src");
+    await wait(1600);
+  }
   for(let i=0;i<state.queue.length;i++){
     const actor=state.queue[i];if(!actor.alive)continue;
     await performAnimatedAction(actor,actor.submission,i+1);
@@ -520,18 +535,23 @@ async function resolveQueue(){
 async function performAnimatedAction(actor,submission,order){
   const action=submission.action.id;
   const actorEl=playerEl(actor.id);
-  actorEl?.classList.add("acting");
-  showSkillBanner(`#${order}  ${actor.name}`,submission.action.name);
-  await wait(850);
-
-  const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges}]));
   const targets=previewTargets(actor,action);
-  targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
-  await wait(500);
+  actorEl?.classList.add("acting");
 
+  if(action==="ultimate"){
+    await showUltimateOverlay();
+  }
+
+  showActionCard(actor,submission,targets,`#${order}`);
+  targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
+  await wait(450);
+
+  const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges,vulnerability:p.vulnerability}]));
   applyAction(actor,submission);
   renderPlayers();
-  await wait(120);
+
+  const effectText=buildEffectSummary(actor,action,before);
+  showActionCard(actor,submission,targets,effectText);
 
   for(const p of state.players){
     const prev=before.get(p.id);if(!prev)continue;
@@ -541,11 +561,9 @@ async function performAnimatedAction(actor,submission,order){
     if(p.guardCharges>prev.guard)animateGuard(p.id);
   }
 
-  if(action==="ultimate")$("#battleFlash").classList.add("ultimate-flash");
-  await wait(action==="ultimate"?1700:1250);
-  $("#battleFlash").className="battle-flash";
+  await wait(1450);
   document.querySelectorAll(".player-chip").forEach(el=>el.classList.remove("acting","targeted","buffing","hit","heal-pop","guard-pop"));
-  await wait(450);
+  await wait(300);
 }
 
 function previewTargets(actor,action){
@@ -605,7 +623,39 @@ function lowestHpEnemy(actor){return state.players.filter(p=>p.alive&&p.id!==act
 function playerEl(id){return document.querySelector(`[data-player-id="${id}"]`)}
 function showActionStage(){$("#actionStage").classList.add("show");$("#formulaZone").classList.add("resolving")}
 function hideActionStage(){$("#actionStage").classList.remove("show");$("#formulaZone").classList.remove("resolving")}
-function showSkillBanner(actor,skill){$("#actionActor").textContent=actor;$("#actionSkill").textContent=skill}
+function showActionCard(actor,submission,targets,effectText=""){
+  showActionStage();
+  $("#actionClassImage").src=`./assets/images/${CLASSES[actor.classId].image}`;
+  $("#actionActor").textContent=actor.name;
+  $("#actionSkill").textContent=submission.action.name||ACTION_META[submission.action.id]?.label||"";
+  $("#actionMainIcon").src=`./assets/images/${ACTION_META[submission.action.id]?.image||"skill-attack.png"}`;
+  $("#actionTarget").textContent=targets.length?`對象：${targets.map(t=>t.name).join("、")}`:"";
+  $("#actionEffect").textContent=effectText;
+}
+function buildEffectSummary(actor,action,before){
+  const parts=[];
+  for(const p of state.players){
+    const prev=before.get(p.id);if(!prev)continue;
+    const hpDiff=p.hp-prev.hp;
+    const guardDiff=p.guardCharges-prev.guard;
+    const vulnDiff=p.vulnerability-prev.vulnerability;
+    if(hpDiff<0)parts.push(`${p.name} 傷害 ${-hpDiff}`);
+    if(hpDiff>0)parts.push(`${p.name} 恢復 +${hpDiff}`);
+    if(guardDiff>0)parts.push(`${p.name} 抵擋 +${guardDiff}`);
+    if(guardDiff<0&&hpDiff===0)parts.push(`${p.name} 抵擋成功`);
+    if(vulnDiff>0)parts.push(`${p.name} ${actor.classId==="warlock"?"詛咒":"破防"} +${vulnDiff}%`);
+    if(vulnDiff<0)parts.push(`${p.name} 增益 淨化 ${-vulnDiff}%`);
+  }
+  return parts.join("｜")||ACTION_META[action]?.label||"";
+}
+async function showUltimateOverlay(){
+  const overlay=$("#ultimateOverlay");
+  overlay.classList.add("show");
+  overlay.setAttribute("aria-hidden","false");
+  await wait(2000);
+  overlay.classList.remove("show");
+  overlay.setAttribute("aria-hidden","true");
+}
 function animateHit(id,amount){const el=playerEl(id);el?.classList.add("hit");floatText(el,`-${amount}`,"damage")}
 function animateHeal(id,amount){const el=playerEl(id);el?.classList.add("heal-pop");floatText(el,`+${amount}`,"heal")}
 function animateGuard(id){const el=playerEl(id);el?.classList.add("guard-pop");floatText(el,"BLOCK","guard")}
@@ -645,7 +695,7 @@ $("#leaveRoomBtn").onclick=leaveWaitingRoom;
 $("#parenBtn").onclick=()=>{
   if(state.submitted||state.roundLocked)return;
   if(state.parenRange){state.parenRange=null;state.parenSelection=[];renderCards();updateFormula();return}
-  state.parenMode=!state.parenMode;state.parenSelection=[];$("#parenBtn").classList.toggle("active",state.parenMode);flashHint(state.parenMode?"數字 → 符號 → 數字":"");
+  state.parenMode=!state.parenMode;state.parenSelection=[];$("#parenBtn").classList.toggle("active",state.parenMode);$("#parenHint").textContent="";
 };
 $("#submitBtn").onclick=submitAnswer;
 $("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);renderRooms();showScreen("lobby")};
