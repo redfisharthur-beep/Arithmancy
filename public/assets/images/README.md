@@ -6,4 +6,4 @@
 - buttons：圖片化 UI 按鈕
 - classes：職業圖示與角色圖片（已預留）
 
-SVG 目前皆為專案內自製向量素材，可直接由 Cloudflare Pages 靜態部署。
+SVG 目前皆為專案內自製向量素材，可直接由 Cloudflare Workers Static Assets 靜態部署。
