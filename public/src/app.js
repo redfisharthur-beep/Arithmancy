@@ -211,6 +211,8 @@ function dragStart(e){
     index:Number(card.dataset.index),
     el:card,
     pointerId:e.pointerId,
+    startX:e.clientX,
+    startY:e.clientY,
     x:e.clientX,
     y:e.clientY
   };
@@ -225,8 +227,8 @@ function dragMove(e){
   e.preventDefault();
   dragging.x=e.clientX;
   dragging.y=e.clientY;
-  const dx=e.clientX-dragging.el.getBoundingClientRect().left-dragging.el.offsetWidth/2;
-  const dy=e.clientY-dragging.el.getBoundingClientRect().top-dragging.el.offsetHeight/2;
+  const dx=e.clientX-dragging.startX;
+  const dy=e.clientY-dragging.startY;
   dragging.el.style.transform=`translate(${dx}px,${dy}px) scale(1.06)`;
   dragging.el.style.zIndex="20";
 }
