@@ -31,7 +31,7 @@ const ACTION_META={
   execute:{label:"尾刀",image:"skill-execute.png"}
 };
 
-const AI_ROOM={id:"AI-001",owner:"訓練模式",players:4,max:4,ai:true};
+const AI_ROOM={id:"AI-001",owner:"訓練模式",players:4,max:6,ai:true};
 
 function showScreen(name){screens.forEach(s=>s.classList.toggle("active",s.dataset.screen===name))}
 
@@ -173,22 +173,19 @@ async function refreshWaitingRoom(){
 
 function renderWaitingRoom(){
   const room=state.waitingRoom;if(!room)return;
-  $("#waitingRoomCode").textContent=room.id;
-  $("#waitingCount").textContent=`${room.players.length}/${room.max||4}`;
-  $("#waitingPlayers").innerHTML=room.players.map((p,i)=>`
+  $("#waitingPlayers").innerHTML=room.players.map(p=>`
     <div class="waiting-player">
-      <span class="seat-no">${i+1}</span>
       <img class="waiting-avatar" src="./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}" alt="">
-      <div><strong>${escapeHtml(p.name)}</strong><small>${CLASSES[p.classId]?.name||"玩家"}</small></div>
+      <strong>${escapeHtml(p.name)}</strong>
       <span class="host-tag">${p.id===room.ownerId?"HOST":""}</span>
-    </div>`).join("")+
-    Array.from({length:Math.max(0,(room.max||4)-room.players.length)},()=>'<div class="waiting-player empty"><span>等待玩家...</span></div>').join("");
-  $("#waitingFightBtn").style.display=state.isHost?"block":"none";
-  $("#waitingHint").textContent=state.isHost?"等朋友加入後開始":"等待房主開始";
+    </div>`).join("");
+  const canStart=state.roomMode==="ai" || room.players.length>=2;
+  $("#waitingFightBtn").style.display=state.isHost&&canStart?"block":"none";
 }
 
 async function hostStartFight(){
   if(!state.waitingRoom||!state.isHost)return;
+  if(state.roomMode==="human"&&state.waitingRoom.players.length<2)return;
   if(state.roomMode==="ai"){
     startRoom(state.waitingRoom.id,state.waitingRoom.players,true);
     return;
@@ -269,10 +266,9 @@ function renderPlayers(){
   $("#playersStrip").innerHTML=state.players.map(p=>{
     const hpPct=Math.max(0,p.hp/p.maxHp*100);
     return `<div class="player-chip ${!p.alive?"dead":""} ${p.isHuman?"self":""}" data-player-id="${p.id}">
-      <img class="player-avatar" src="./assets/images/${CLASSES[p.classId].image}" alt="${CLASSES[p.classId].name}">
-      <div class="topline"><span>${p.name} · ${CLASSES[p.classId].name}</span><span>${Math.max(0,p.hp)}</span></div>
+      <img class="player-avatar" src="./assets/images/${CLASSES[p.classId].image}" alt="">
+      <div class="topline"><span>${p.name}</span><span>${Math.max(0,p.hp)}</span></div>
       <div class="hpbar"><i style="width:${hpPct}%"></i></div>
-      <div class="statusline"><span>${p.guardCharges?"抵擋 ×"+p.guardCharges:""}</span><span>${p.vulnerability?"破防 "+p.vulnerability+"%":""}</span><span>${p.submitted?"已送出":p.alive?"思考中":"淘汰"}</span></div>
     </div>`;
   }).join("");
 }
@@ -376,9 +372,6 @@ function actionFor(value,classId=state.selectedClass){
 
 function updateFormula(){
   const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value);
-  $("#formulaText").textContent=formula||"";
-  $("#formulaResult").textContent=value===null?"—":value;
-  $("#matchedAction").textContent=action.name;
   document.querySelectorAll(".target-chip").forEach(el=>el.classList.toggle("matched",action.id===el.dataset.action));
 }
 
@@ -619,7 +612,7 @@ function checkBattleEnd(){
 }
 
 function addLog(text){state.battleLog.unshift(text);state.battleLog=state.battleLog.slice(0,6);renderLog()}
-function renderLog(){$("#battleLog").innerHTML=state.battleLog.map(x=>`<div>${x}</div>`).join("")}
+function renderLog(){}
 
 function showResults(){
   clearInterval(state.timerId);hideActionStage();
