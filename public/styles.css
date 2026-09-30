@@ -1,7 +1,7 @@
 :root{font-family:"Noto Sans TC","Source Han Sans TC",sans-serif;color:#f1f1eb;background:#10130f;font-weight:300;--glass:rgba(18,22,18,.76);--line:rgba(231,226,204,.18);--muted:#aeb3a7;--accent:#d7bf79}
 *{box-sizing:border-box}html,body,#app{margin:0;min-height:100%;width:100%}body{min-height:100vh;overflow-x:hidden;background:#10130f}button,input{font:inherit}button{color:inherit}
 .screen{display:none;min-height:100vh;width:100%;background-size:cover;background-position:center;padding:24px}.screen.active{display:flex}
-.screen-home{background-image:url("./assets/images/backgrounds/home.svg");align-items:center;justify-content:center}.screen-lobby{background-image:url("./assets/images/backgrounds/lobby.svg");align-items:center;justify-content:center}.screen-waiting{background-image:url("./assets/images/backgrounds/lobby.svg");align-items:center;justify-content:center}.screen-battle{background-image:url("./assets/images/backgrounds/battle.svg");align-items:stretch;justify-content:center}.screen-results{background-image:url("./assets/images/backgrounds/results.svg");align-items:center;justify-content:center}
+.screen-home{background-image:url("./assets/images/home-bg.png");align-items:center;justify-content:center}.screen-lobby{background-image:url("./assets/images/lobby-bg.png");align-items:center;justify-content:center}.screen-waiting{background-image:url("./assets/images/lobby-bg.png");align-items:center;justify-content:center}.screen-battle{background-image:url("./assets/images/battle-bg.png");align-items:stretch;justify-content:center}.screen-results{background-image:url("./assets/images/results-bg.png");align-items:center;justify-content:center}
 .home-center{width:min(420px,88vw);display:flex;flex-direction:column;gap:22px;align-items:center}.name-input{width:100%;height:58px;border:1px solid var(--line);border-radius:16px;background:rgba(10,12,10,.70);color:white;text-align:center;font-size:18px;outline:none;backdrop-filter:blur(12px)}.name-input:focus{border-color:rgba(215,191,121,.6)}
 .image-button{border:0;padding:0;background:none;cursor:pointer;transition:transform .16s ease,filter .16s ease}.image-button:hover{transform:translateY(-2px);filter:brightness(1.08)}.image-button:active{transform:scale(.97)}.image-button img{display:block;width:100%;height:auto}.fight-button{width:190px}
 .panel{width:min(1080px,96vw);border:1px solid var(--line);border-radius:24px;background:var(--glass);backdrop-filter:blur(16px);box-shadow:0 22px 70px rgba(0,0,0,.28)}
@@ -125,4 +125,28 @@ body{touch-action:manipulation}
 
 @media (pointer:coarse) and (orientation:landscape) and (max-height:520px){
   .screen-battle .battle-log{display:grid;font-size:clamp(10px,1.45vw,12px);width:clamp(170px,22vw,230px)}
+}
+
+/* New unified image assets */
+.class-card{position:relative;overflow:hidden;padding:0;justify-content:flex-end;background:rgba(10,13,10,.62)}
+.class-card .class-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;opacity:.9;transition:transform .22s ease,filter .22s ease}
+.class-card:hover .class-art,.class-card.selected .class-art{transform:scale(1.045);filter:brightness(1.06)}
+.class-card .class-info{position:relative;z-index:2;width:100%;padding:34px 12px 11px;background:linear-gradient(transparent,rgba(8,10,8,.9) 42%,rgba(8,10,8,.97))}
+.class-card strong,.class-card span,.class-card small{position:relative;z-index:2}
+.target-chip{position:relative;overflow:hidden;padding-left:42px}
+.target-chip .action-icon{position:absolute;left:7px;top:50%;transform:translateY(-50%);width:30px;height:30px;object-fit:contain}
+.player-chip{display:grid;grid-template-columns:44px 1fr;column-gap:9px}
+.player-avatar{grid-row:1/4;width:44px;height:44px;border-radius:10px;object-fit:cover;object-position:center top;border:1px solid rgba(215,191,121,.28);align-self:center}
+.player-chip .topline,.player-chip .hpbar,.player-chip .statusline{grid-column:2}
+.waiting-player{grid-template-columns:36px 42px 1fr 56px}
+.waiting-avatar{width:38px;height:38px;border-radius:9px;object-fit:cover;object-position:center top;border:1px solid var(--line)}
+.rank-player{display:flex;align-items:center;gap:8px}
+.rank-avatar{width:34px;height:34px;border-radius:8px;object-fit:cover;object-position:center top;border:1px solid var(--line)}
+
+@media (pointer:coarse) and (orientation:landscape){
+  .class-card .class-info{padding:26px 8px 7px}
+  .target-chip{padding-left:34px}
+  .target-chip .action-icon{width:24px;height:24px;left:5px}
+  .player-chip{grid-template-columns:34px 1fr;column-gap:6px}
+  .player-avatar{width:34px;height:34px;border-radius:8px}
 }
