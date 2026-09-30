@@ -9,7 +9,7 @@
 - 戰鬥：30 秒回合、共享 3 數字 + 2 運算符號、拖曳排序、括號模式、答案條件與送出
 - 結算：輸出傷害、恢復量、終極絕招次數
 - 全站字體：Noto Sans TC
-- 所有背景與操作按鈕皆放在 `assets/images/`
+- 所有背景與操作按鈕皆放在 `public/assets/images/`
 
 ## 括號操作
 
@@ -23,7 +23,7 @@
 
 ## Cloudflare 架構預留
 
-目前是純前端，可以直接部署 Cloudflare Pages。
+目前前端位於 `public/`，由 Cloudflare Workers Static Assets 與 Worker API 一起部署。
 
 正式多人版建議：
 
@@ -51,9 +51,9 @@
 
 ## 圖片
 
-- `assets/images/backgrounds/`：頁面背景
-- `assets/images/buttons/`：Fight、括號、重置、送出
-- `assets/images/classes/`：預留職業圖示 / 角色插畫
+- `public/assets/images/backgrounds/`：頁面背景
+- `public/assets/images/buttons/`：Fight、括號、重置、送出
+- `public/assets/images/classes/`：預留職業圖示 / 角色插畫
 
 
 ## 第二階段：戰鬥系統
@@ -92,3 +92,30 @@
 - `docs/multiplayer-protocol.md`
 
 目前 Worker 是多人同步骨架，尚未取代前端本地模擬。正式上線多人版時，房間牌組、倒數、答案驗證、送出順位與戰鬥結算都應移到 Durable Object。
+
+
+## 目前部署結構
+
+```text
+Arithmancy/
+├─ public/
+│  ├─ index.html
+│  ├─ styles.css
+│  ├─ src/
+│  │  └─ app.js
+│  └─ assets/
+│     └─ images/
+├─ worker/
+│  └─ src/
+│     └─ index.js
+└─ wrangler.toml
+```
+
+Cloudflare Workers Builds 可直接使用：
+
+- Build command：無
+- Deploy command：`npx wrangler deploy`
+- Root directory：`/`
+- Production branch：`main`
+
+`wrangler.toml` 已設定 `[assets] directory = "./public"`，因此同一次部署會同時發布遊戲前端與 Worker。
