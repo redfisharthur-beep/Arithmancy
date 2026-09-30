@@ -31,15 +31,14 @@ const ACTION_META={
   execute:{label:"尾刀",image:"skill-execute.png"}
 };
 
-const AI_ROOM={id:"AI-001",owner:"AI 訓練房",players:4,max:4,ai:true};
+const AI_ROOM={id:"AI-001",owner:"訓練模式",players:4,max:4,ai:true};
 
 function showScreen(name){screens.forEach(s=>s.classList.toggle("active",s.dataset.screen===name))}
 
 function renderClasses(){
   $("#classGrid").innerHTML=Object.entries(CLASSES).map(([id,c])=>`
-    <button class="class-card ${state.selectedClass===id?"selected":""}" data-class="${id}">
+    <button class="class-card ${state.selectedClass===id?"selected":""}" data-class="${id}" aria-label="${c.name}">
       <img class="class-art" src="./assets/images/${c.image}" alt="${c.name}">
-      <span class="class-info"><strong>${c.name}</strong><span>${c.specialty}</span><small>${c.ultimate}</small></span>
     </button>`).join("");
   document.querySelectorAll(".class-card").forEach(btn=>btn.onclick=()=>{state.selectedClass=btn.dataset.class;renderClasses()});
 }
@@ -48,7 +47,7 @@ async function renderRooms(){
   const list=$("#roomList");
   list.innerHTML=`
     <div class="room-item ai-room">
-      <span><strong>${AI_ROOM.id}</strong> · ${AI_ROOM.owner}</span>
+      <span><strong>${AI_ROOM.owner}</strong></span>
       <button data-ai-room>加入</button>
     </div>
     <div class="room-loading">讀取真人房間中...</div>`;
@@ -66,7 +65,6 @@ async function renderRooms(){
       </div>`).join("");
     list.querySelector(".room-loading")?.remove();
     if(humanHtml) list.insertAdjacentHTML("beforeend",humanHtml);
-    else list.insertAdjacentHTML("beforeend",'<div class="room-empty">目前沒有真人房間</div>');
     list.querySelectorAll("[data-human-room]").forEach(btn=>btn.onclick=()=>joinHumanRoom(btn.dataset.humanRoom));
   }catch{
     list.querySelector(".room-loading")?.remove();
