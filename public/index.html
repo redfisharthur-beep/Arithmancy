@@ -1,32 +1,35 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#141713"><title>Arithmancy</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0d100d">
+  <title>Arithmancy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<div id="orientationGate" class="orientation-gate" aria-hidden="true">
-  <div class="rotate-card">
-    <div class="rotate-icon"><span></span></div>
-    <strong>請將裝置橫放</strong>
-    <small>橫向 16:9 遊玩</small>
-  </div>
-</div>
-<div id="gameViewport" class="game-viewport">
-  <div id="gameStage" class="game-stage">
 <main id="app">
-  <section class="screen screen-home active" data-screen="home"><div class="home-center">
-    <input id="playerName" class="name-input" maxlength="12" placeholder="輸入名字" autocomplete="off">
-    <button id="fightBtn" class="image-button fight-button" aria-label="Fight"><img src="./assets/images/fight.png" alt="Fight"></button>
-  </div></section>
+  <section class="screen screen-home active" data-screen="home">
+    <div class="home-center">
+      <input id="playerName" class="name-input" maxlength="12" placeholder="輸入名字" autocomplete="off">
+      <button id="fightBtn" class="image-button fight-button" aria-label="Fight">
+        <img src="./assets/images/fight.png" alt="Fight">
+      </button>
+    </div>
+  </section>
 
-  <section class="screen screen-lobby" data-screen="lobby"><div class="panel lobby-panel">
-    <div class="class-grid" id="classGrid"></div>
-    <div class="lobby-actions"><button id="createRoomBtn" class="soft-button">建立房間</button><div class="room-list" id="roomList"></div></div>
-  </div></section>
+  <section class="screen screen-lobby" data-screen="lobby">
+    <div class="panel lobby-panel">
+      <div class="class-grid" id="classGrid"></div>
+      <div class="lobby-actions">
+        <button id="createRoomBtn" class="soft-button">建立房間</button>
+        <div class="room-list" id="roomList"></div>
+      </div>
+    </div>
+  </section>
 
   <section class="screen screen-waiting" data-screen="waiting">
     <div class="panel waiting-panel">
@@ -37,38 +40,66 @@
       <div id="waitingPlayers" class="waiting-players"></div>
       <div class="waiting-footer">
         <span id="waitingHint">等朋友加入後開始</span>
-        <button id="waitingFightBtn" class="image-button fight-button" aria-label="Fight"><img src="./assets/images/fight.png" alt="Fight"></button>
+        <button id="waitingFightBtn" class="image-button fight-button" aria-label="Fight">
+          <img src="./assets/images/fight.png" alt="Fight">
+        </button>
         <button id="leaveRoomBtn" class="soft-button compact">離開房間</button>
       </div>
     </div>
   </section>
 
-  <section class="screen screen-battle" data-screen="battle"><div class="battle-shell">
-    <section class="players-strip" id="playersStrip"></section>
-    <header class="battle-top">
-      <div class="round-timer"><span id="roundLabel">Q1/10</span><strong id="timer">60</strong></div>
-      <div class="conditions"><div class="action-bands" id="actionBands"></div></div>
-    </header>
-    <section class="formula-zone" id="formulaZone">
-      <div class="battle-flash" id="battleFlash"></div>
-      <div class="action-stage" id="actionStage"><span id="actionActor"></span><strong id="actionSkill"></strong></div>
-      <div class="battle-log" id="battleLog"></div>
-      <div class="formula-preview"><span id="formulaText">請排列卡牌</span><strong id="formulaResult">—</strong><span id="matchedAction"></span></div>
-      <div class="cards-row" id="cardsRow"></div><div class="paren-hint" id="parenHint"></div>
-    </section>
-    <footer class="battle-controls">
-      <button id="parenBtn" class="image-button control-image" aria-label="括號"><img src="./assets/images/parentheses.png" alt="括號"></button>
-      <button id="resetBtn" class="image-button control-image" aria-label="重置"><img src="./assets/images/reset.png" alt="重置"></button>
-      <button id="submitBtn" class="image-button control-image primary" aria-label="送出答案"><img src="./assets/images/submit.png" alt="送出答案"></button>
-    </footer>
-  </div></section>
+  <section class="screen screen-battle" data-screen="battle">
+    <div class="battle-shell">
+      <section class="players-strip" id="playersStrip"></section>
 
-  <section class="screen screen-results" data-screen="results"><div class="panel results-panel">
-    <div class="winner"><span>WINNER</span><strong id="winnerName"></strong></div>
-    <div id="ranking" class="ranking"></div><button id="backLobbyBtn" class="soft-button">返回大廳</button>
-  </div></section>
+      <header class="battle-top">
+        <div class="round-timer">
+          <span id="roundLabel">Q1/10</span>
+          <strong id="timer">60</strong>
+        </div>
+        <div class="conditions">
+          <div class="action-bands" id="actionBands"></div>
+        </div>
+      </header>
+
+      <section class="formula-zone" id="formulaZone">
+        <div class="battle-flash" id="battleFlash"></div>
+        <div class="action-stage" id="actionStage">
+          <span id="actionActor"></span>
+          <strong id="actionSkill"></strong>
+        </div>
+        <div class="battle-log" id="battleLog"></div>
+        <div class="formula-preview">
+          <span id="formulaText"></span>
+          <strong id="formulaResult">—</strong>
+          <span id="matchedAction"></span>
+        </div>
+        <div class="cards-row" id="cardsRow"></div>
+        <div class="paren-hint" id="parenHint"></div>
+      </section>
+
+      <footer class="battle-controls">
+        <button id="parenBtn" class="image-button control-image" aria-label="括號">
+          <img src="./assets/images/parentheses.png" alt="括號">
+        </button>
+        <button id="resetBtn" class="image-button control-image" aria-label="重置">
+          <img src="./assets/images/reset.png" alt="重置">
+        </button>
+        <button id="submitBtn" class="image-button control-image primary" aria-label="送出答案">
+          <img src="./assets/images/submit.png" alt="送出答案">
+        </button>
+      </footer>
+    </div>
+  </section>
+
+  <section class="screen screen-results" data-screen="results">
+    <div class="panel results-panel">
+      <div class="winner"><span>WINNER</span><strong id="winnerName"></strong></div>
+      <div id="ranking" class="ranking"></div>
+      <button id="backLobbyBtn" class="soft-button">返回大廳</button>
+    </div>
+  </section>
 </main>
-  </div>
-</div>
 <script type="module" src="./src/app.js"></script>
-</body></html>
+</body>
+</html>
