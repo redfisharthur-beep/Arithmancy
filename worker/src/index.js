@@ -469,9 +469,54 @@ function evaluateFormula(formula){
   if(!formula)return null;
   const safe=formula.replaceAll("−","-").replaceAll("×","*").replaceAll("÷","/").replaceAll(" ","");
   if(!/^[0-9+\-*/().]+$/.test(safe))return null;
+
+  // Cloudflare Workers blocks eval/new Function. Parse the tiny arithmetic
+  // grammar directly so room creation and server-side answer validation work.
+  let i=0;
+  const peek=()=>safe[i];
+  const eat=ch=>peek()===ch?(i++,true):false;
+  const number=()=>{
+    const start=i;
+    while(i<safe.length&&/[0-9.]/.test(safe[i]))i++;
+    if(start===i)return null;
+    const token=safe.slice(start,i);
+    if(!/^\\d+(?:\\.\\d+)?$/.test(token))return null;
+    const n=Number(token);
+    return Number.isFinite(n)?n:null;
+  };
+  const factor=()=>{
+    if(eat("(")){
+      const v=expression();
+      if(v===null||!eat(")"))return null;
+      return v;
+    }
+    return number();
+  };
+  const term=()=>{
+    let v=factor();
+    if(v===null)return null;
+    while(peek()==="*"||peek()==="/"){
+      const op=safe[i++],rhs=factor();
+      if(rhs===null||(op==="/"&&rhs===0))return null;
+      v=op==="*"?v*rhs:v/rhs;
+    }
+    return v;
+  };
+  const expression=()=>{
+    let v=term();
+    if(v===null)return null;
+    while(peek()==="+"||peek()==="-"){
+      const op=safe[i++],rhs=term();
+      if(rhs===null)return null;
+      v=op==="+"?v+rhs:v-rhs;
+    }
+    return v;
+  };
+
   try{
-    const v=Function(`"use strict";return (${safe})`)();
-    return Number.isFinite(v)?Math.round(v*100)/100:null;
+    const v=expression();
+    if(v===null||i!==safe.length||!Number.isFinite(v))return null;
+    return Math.round(v*100)/100;
   }catch{return null}
 }
 function validateAndEvaluate(formula,cards){
