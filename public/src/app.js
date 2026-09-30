@@ -468,38 +468,79 @@ function renderCards(){
 
 let dragging=null;
 function dragStart(e){
-  if(state.parenMode||state.submitted||state.roundLocked)return;
+  if(state.parenMode||state.submitted||state.roundLocked||dragging)return;
+  if(e.pointerType==="mouse"&&e.button!==0)return;
   e.preventDefault();
   const el=e.currentTarget;
-  dragging={index:+el.dataset.index,el,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY};
+  const row=$("#cardsRow");
+  const rect=el.getBoundingClientRect();
+  dragging={
+    index:+el.dataset.index,
+    el,row,pointerId:e.pointerId,
+    startX:e.clientX,
+    centerX:rect.left+rect.width/2,
+    targetIndex:+el.dataset.index
+  };
+  try{el.setPointerCapture(e.pointerId)}catch{}
   el.classList.add("dragging");
   document.addEventListener("pointermove",dragMove,{passive:false});
-  document.addEventListener("pointerup",dragEnd,{once:true});
-  document.addEventListener("pointercancel",dragEnd,{once:true});
+  document.addEventListener("pointerup",dragEnd);
+  document.addEventListener("pointercancel",dragCancel);
 }
 function dragMove(e){
   if(!dragging||e.pointerId!==dragging.pointerId)return;
   e.preventDefault();
-  const dx=e.clientX-dragging.startX,dy=e.clientY-dragging.startY;
-  dragging.el.style.transform=`translate(${dx}px,${dy}px) scale(1.06)`;
+  const dx=e.clientX-dragging.startX;
+  dragging.el.style.transform=`translateX(${dx}px) scale(1.06)`;
   dragging.el.style.zIndex="20";
+
+  // Decide the destination by horizontal slots only. This avoids mobile
+  // getBoundingClientRect feedback from the transformed card itself.
+  const cards=[...dragging.row.querySelectorAll(".card")];
+  const centers=cards.map(card=>{
+    if(card===dragging.el)return dragging.centerX;
+    const r=card.getBoundingClientRect();
+    return r.left+r.width/2;
+  });
+  let target=0;
+  let best=Math.abs(e.clientX-centers[0]);
+  for(let i=1;i<centers.length;i++){
+    const d=Math.abs(e.clientX-centers[i]);
+    if(d<best){best=d;target=i}
+  }
+  dragging.targetIndex=target;
+  cards.forEach((card,i)=>card.classList.toggle("drop-target",i===target&&i!==dragging.index));
+}
+function finishDrag(commit){
+  if(!dragging)return;
+  const {index:source,targetIndex:target,el,row,pointerId}=dragging;
+  document.removeEventListener("pointermove",dragMove);
+  document.removeEventListener("pointerup",dragEnd);
+  document.removeEventListener("pointercancel",dragCancel);
+  try{el.releasePointerCapture(pointerId)}catch{}
+  el.classList.remove("dragging");
+  el.style.transform="";
+  el.style.zIndex="";
+  row.querySelectorAll(".drop-target").forEach(card=>card.classList.remove("drop-target"));
+  dragging=null;
+
+  if(commit&&target!==source){
+    const [moved]=state.cards.splice(source,1);
+    state.cards.splice(target,0,moved);
+    state.parenRange=null;
+    state.parenSelection=[];
+  }
+  renderCards();
+  updateFormula();
 }
 function dragEnd(e){
-  if(!dragging)return;
-  document.removeEventListener("pointermove",dragMove);
-  const source=dragging.index,row=$("#cardsRow"),els=[...row.querySelectorAll(".card")];
-  let target=source,best=Infinity;
-  els.forEach((el,i)=>{
-    if(i===source)return;
-    const r=el.getBoundingClientRect(),d=Math.hypot(e.clientX-(r.left+r.width/2),e.clientY-(r.top+r.height/2));
-    if(d<best){best=d;target=i}
-  });
-  dragging.el.classList.remove("dragging");dragging.el.style.transform="";dragging.el.style.zIndex="";
-  if(target!==source){
-    const [moved]=state.cards.splice(source,1);state.cards.splice(target,0,moved);
-    state.parenRange=null;state.parenSelection=[];
-  }
-  dragging=null;renderCards();updateFormula();
+  if(!dragging||e.pointerId!==dragging.pointerId)return;
+  e.preventDefault();
+  finishDrag(true);
+}
+function dragCancel(e){
+  if(!dragging||e.pointerId!==dragging.pointerId)return;
+  finishDrag(false);
 }
 
 function selectParen(index){
