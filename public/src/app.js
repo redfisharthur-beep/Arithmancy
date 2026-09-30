@@ -12,7 +12,8 @@ const state={
   submitted:false,timerId:null,roundEndsAt:0,players:[],queue:[],battleLog:[],
   roundLocked:false,targets:[],solutions:{},
   clientId:sessionStorage.getItem("arithmancyClientId")||crypto.randomUUID(),
-  waitingRoom:null,isHost:false,roomMode:null,waitingPoll:null
+  waitingRoom:null,isHost:false,roomMode:null,waitingPoll:null,
+  battlePoll:null,lastEventVersion:-1,playingServerEvents:false
 };
 sessionStorage.setItem("arithmancyClientId",state.clientId);
 
@@ -79,9 +80,12 @@ function makePlayer(id,name,classId,isHuman=false){
   return {id,name,classId,isHuman,hp:100,maxHp:100,guardCharges:0,effects:[],damage:0,healing:0,ultimates:0,alive:true,submitted:false,submission:null};
 }
 
-function startRoom(id,roomPlayers=null,aiMode=false){
+function startRoom(id,roomPlayers=null,aiMode=false,battle=null){
   clearInterval(state.waitingPoll);
+  clearInterval(state.battlePoll);
   state.roomId=id;state.round=1;state.roomMode=aiMode?"ai":"human";
+  state.battleLog=[];
+
   if(aiMode){
     state.players=[
       makePlayer(state.clientId,state.playerName,state.selectedClass,true),
@@ -89,15 +93,161 @@ function startRoom(id,roomPlayers=null,aiMode=false){
       makePlayer("ai-assassin","Kai","assassin"),
       makePlayer("ai-priest","Nora","priest")
     ];
-  }else{
-    const src=(roomPlayers||[]).slice(0,6);
-    state.players=src.map((p,i)=>makePlayer(p.id||("human-"+i),p.name,p.classId,p.id===state.clientId));
-    while(state.players.length<2)state.players.push(makePlayer("guest-"+state.players.length,"等待玩家","warrior"));
-    state.players=state.players.filter(p=>p.name!=="等待玩家");
+    showScreen("battle");
+    beginRound();
+    return;
   }
-  state.battleLog=[];
+
+  state.lastEventVersion=-1;
+  state.playingServerEvents=false;
   showScreen("battle");
-  beginRound();
+  if(battle)syncHumanBattle(battle,true);
+  state.battlePoll=setInterval(refreshHumanBattle,700);
+}
+
+async function refreshHumanBattle(){
+  if(state.roomMode!=="human"||!state.roomId)return;
+  try{
+    const res=await fetch(`/api/rooms/${encodeURIComponent(state.roomId)}/state`,{cache:"no-store"});
+    const data=await res.json();
+    if(!data.room?.battle)return;
+    state.waitingRoom=data.room;
+    await syncHumanBattle(data.room.battle,false);
+  }catch{}
+}
+
+async function syncHumanBattle(battle,initial=false){
+  if(!battle)return;
+  state.round=battle.round;
+  state.roundEndsAt=battle.roundEndsAt||0;
+  state.targets=battle.targets||[];
+  state.cards=(battle.cards||[]).map(c=>({...c}));
+  state.originalCards=state.cards.map(c=>({...c}));
+  state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
+
+  const me=state.players.find(p=>p.id===state.clientId);
+  state.submitted=Boolean(me?.submitted);
+  state.roundLocked=battle.phase!=="question";
+  $("#roundLabel").textContent=`Q${battle.round}/${battle.maxRounds||MAX_ROUNDS}`;
+  renderTargets();
+  renderPlayers();
+
+  if(battle.phase==="question"){
+    if(initial||state.renderedServerRound!==battle.round){
+      state.renderedServerRound=battle.round;
+      state.parenRange=null;state.parenSelection=[];state.parenMode=false;
+      renderCards();updateFormula();hideActionStage();
+    }
+    $("#submitBtn").disabled=state.submitted;
+    $("#submitBtn").classList.toggle("submitted",state.submitted);
+    $("#answerDisplay")?.classList.toggle("submitted",state.submitted);
+    updateServerTimer();
+  }else{
+    clearInterval(state.timerId);
+    if(battle.eventVersion!==state.lastEventVersion&&!state.playingServerEvents){
+      state.lastEventVersion=battle.eventVersion;
+      await playServerEvents(battle);
+    }else{
+      renderPlayers();
+    }
+  }
+
+  if(battle.phase==="ended"||battle.ended&&battle.phase!=="question"&&Date.now()>=battle.nextRoundAt){
+    clearInterval(state.battlePoll);
+    showResults();
+  }
+}
+
+function updateServerTimer(){
+  clearInterval(state.timerId);
+  const tick=()=>{
+    state.seconds=Math.max(0,Math.ceil((state.roundEndsAt-Date.now())/1000));
+    $("#timer").textContent=state.seconds;
+  };
+  tick();
+  state.timerId=setInterval(tick,200);
+}
+
+function hydrateSnapshot(snapshot,battlePlayers){
+  return snapshot.map(x=>{
+    const meta=battlePlayers.find(p=>p.id===x.id)||{};
+    return {...meta,...x,isHuman:x.id===state.clientId,effects:meta.effects||[]};
+  });
+}
+
+function actionNameFor(actor,actionId){
+  if(actionId==="ultimate")return CLASSES[actor.classId]?.ultimate||"絕招";
+  if(actionId==="attack")return actor.classId==="warlock"?"詛咒":"攻擊";
+  if(actionId==="heal")return actor.classId==="warlock"?"增益":"恢復";
+  return ACTION_META[actionId]?.label||"";
+}
+
+async function playServerEvents(battle){
+  state.playingServerEvents=true;
+  state.roundLocked=true;
+  $("#submitBtn").disabled=true;
+  $("#submitBtn").classList.add("submitted");
+
+  const events=battle.events||[];
+  if(!events.length){
+    showActionStage();
+    $("#actionActor").textContent="";
+    $("#actionSkill").textContent="本題無人行動";
+    $("#actionTarget").textContent="";
+    $("#actionEffect").textContent="";
+    $("#actionClassImage").removeAttribute("src");
+    $("#actionMainIcon").removeAttribute("src");
+    await wait(1200);
+    hideActionStage();
+  }
+
+  for(const event of events){
+    const actor=battle.players.find(p=>p.id===event.actorId);
+    if(!actor)continue;
+    const before=hydrateSnapshot(event.before||[],battle.players);
+    const after=hydrateSnapshot(event.after||[],battle.players);
+    const targets=(event.targetIds||[]).map(id=>battle.players.find(p=>p.id===id)).filter(Boolean);
+
+    state.players=before;
+    renderPlayers();
+    if(event.actionId==="ultimate")await showUltimateOverlay(actor.classId);
+
+    const submission={action:{id:event.actionId,name:actionNameFor(actor,event.actionId)}};
+    showActionCard(actor,submission,targets,"");
+    await wait(400);
+
+    state.players=after;
+    renderPlayers();
+    const summary=serverEventSummary(event,battle.players);
+    showActionCard(actor,submission,targets,summary);
+
+    for(const p of after){
+      const prev=before.find(x=>x.id===p.id);if(!prev)continue;
+      const diff=p.hp-prev.hp;
+      if(diff<0)animateHit(p.id,-diff);
+      else if(diff>0)animateHeal(p.id,diff);
+      if(p.guardCharges>prev.guardCharges)animateGuard(p.id);
+    }
+    await wait(1350);
+  }
+
+  state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
+  renderPlayers();hideActionStage();
+  state.playingServerEvents=false;
+}
+
+function serverEventSummary(event,players){
+  const names=new Map(players.map(p=>[p.id,p.name]));
+  const parts=[];
+  for(const a of event.after||[]){
+    const b=(event.before||[]).find(x=>x.id===a.id);if(!b)continue;
+    const name=names.get(a.id)||"玩家";
+    if(a.hp<b.hp)parts.push(`${name} 傷害 ${b.hp-a.hp}`);
+    if(a.hp>b.hp)parts.push(`${name} 恢復 +${a.hp-b.hp}`);
+    if(a.guardCharges>b.guardCharges)parts.push(`${name} 抵擋 +${a.guardCharges-b.guardCharges}`);
+    if(a.guardCharges<b.guardCharges&&a.hp===b.hp)parts.push(`${name} 抵擋成功`);
+  }
+  return parts.join("｜")||"";
 }
 
 async function createHumanRoom(){
@@ -169,7 +319,7 @@ async function refreshWaitingRoom(){
     renderWaitingRoom();
     if(data.room.started){
       clearInterval(state.waitingPoll);
-      startRoom(data.room.id,data.room.players,false);
+      startRoom(data.room.id,data.room.players,false,data.room.battle);
     }
   }catch{}
 }
@@ -201,7 +351,7 @@ async function hostStartFight(){
     if(!res.ok)throw new Error("start failed");
     const {room}=await res.json();
     state.waitingRoom=room;
-    startRoom(room.id,room.players,false);
+    startRoom(room.id,room.players,false,room.battle);
   }catch{
     alert("無法開始房間");
   }
@@ -209,6 +359,7 @@ async function hostStartFight(){
 
 function leaveWaitingRoom(){
   clearInterval(state.waitingPoll);
+  clearInterval(state.battlePoll);
   state.waitingRoom=null;state.isHost=false;
   renderRooms();showScreen("lobby");
 }
@@ -471,11 +622,41 @@ function resetFormula(){
   $("#parenBtn").classList.remove("active");renderCards();updateFormula();
 }
 
-function submitAnswer(){
+async function submitAnswer(){
   if(state.submitted||state.roundLocked)return;
   const human=state.players.find(p=>p.isHuman);if(!human?.alive)return;
   const formula=formulaString(),result=evaluateFormula(formula),action=actionFor(result,human.classId);
-  if(result===null)return flashHint("算式尚未完成");
+  if(result===null)return;
+
+  if(state.roomMode==="human"){
+    state.submitted=true;
+    $("#answerDisplay")?.classList.add("submitted");
+    $("#submitBtn").disabled=true;
+    $("#submitBtn").classList.add("submitted");
+    try{
+      const res=await fetch(`/api/rooms/${encodeURIComponent(state.roomId)}/submit`,{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({playerId:state.clientId,formula})
+      });
+      const data=await res.json();
+      if(!res.ok){
+        state.submitted=false;
+        $("#submitBtn").disabled=false;
+        $("#submitBtn").classList.remove("submitted");
+        $("#answerDisplay")?.classList.remove("submitted");
+        return;
+      }
+      if(data.room?.battle)await syncHumanBattle(data.room.battle,false);
+    }catch{
+      state.submitted=false;
+      $("#submitBtn").disabled=false;
+      $("#submitBtn").classList.remove("submitted");
+      $("#answerDisplay")?.classList.remove("submitted");
+    }
+    return;
+  }
+
   state.submitted=true;human.submitted=true;
   human.submission={forfeit:false,formula,result,action,at:Date.now(),elapsed:ROUND_SECONDS-state.seconds};
   $("#answerDisplay")?.classList.add("submitted");
@@ -511,7 +692,11 @@ function finalizeRoundWhenReady(force){
   const alive=state.players.filter(p=>p.alive);
   if(!force&&alive.some(p=>!p.submitted))return;
   state.roundLocked=true;clearInterval(state.timerId);
-  state.queue=alive.filter(p=>p.submission&&!p.submission.forfeit&&p.submission.action?.id!=="invalid").sort((a,b)=>a.submission.at-b.submission.at);
+  state.queue=alive.filter(p=>p.submission&&!p.submission.forfeit&&p.submission.action?.id!=="invalid").sort((a,b)=>{
+    const sa=Math.floor((a.submission.elapsed??ROUND_SECONDS));
+    const sb=Math.floor((b.submission.elapsed??ROUND_SECONDS));
+    return sa===sb?Math.random()-.5:sa-sb;
+  });
   resolveQueue();
 }
 
@@ -544,7 +729,7 @@ async function performAnimatedAction(actor,submission,order){
   actorEl?.classList.add("acting");
 
   if(action==="ultimate"){
-    await showUltimateOverlay();
+    await showUltimateOverlay(actor.classId);
   }
 
   showActionCard(actor,submission,targets,`#${order}`);
@@ -604,8 +789,8 @@ function applyAction(actor,submission){
     if(actor.classId==="warrior") heal(actor,scaled(BASE_HEAL,1.5));
     else if(actor.classId==="priest") heal(actor,scaled(BASE_HEAL,2));
     else if(actor.classId==="warlock"){
-      heal(actor,scaled(BASE_HEAL,.5));
-      addEffect(actor,{type:"hot",remaining:1,amount:scaled(BASE_HEAL,.5),sourceId:actor.id});
+      heal(actor,scaled(BASE_HEAL,.8));
+      addEffect(actor,{type:"hot",remaining:1,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
     }else heal(actor,BASE_HEAL);
     return;
   }
@@ -613,10 +798,10 @@ function applyAction(actor,submission){
   if(action==="attack"){
     const target=highestHpEnemy(actor);
     if(!target)return;
-    const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:1}[actor.classId]??1;
+    const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,scaled(BASE_DAMAGE,mult),actor.classId==="warlock"?"詛咒":"攻擊");
     if(actor.classId==="warlock"&&target.alive){
-      addEffect(target,{type:"dot",remaining:1,amount:BASE_DAMAGE,sourceId:actor.id});
+      addEffect(target,{type:"dot",remaining:1,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
     }
     return;
   }
@@ -624,8 +809,8 @@ function applyAction(actor,submission){
   if(action==="execute"){
     if(actor.classId==="mage"){
       const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
-      const lowest=[...enemies].sort((a,b)=>a.hp-b.hp)[0];
-      enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===lowest?.id?1.5:1),"尾刀",false));
+      const lowest=randomTiedLocal(enemies,p=>p.hp,"min");
+      enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===lowest?.id?1.2:.6),"尾刀",false));
       return;
     }
     const target=lowestHpEnemy(actor);
@@ -644,8 +829,8 @@ function applyUltimate(actor){
   }
 
   if(actor.classId==="mage"){
-    const highest=[...enemies].sort((a,b)=>b.hp-a.hp)[0];
-    enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.5:1),"元素風暴",false));
+    const highest=randomTiedLocal(enemies,p=>p.hp,"max");
+    enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8),"元素風暴",false));
     return;
   }
 
@@ -673,7 +858,7 @@ function applyUltimate(actor){
   if(actor.classId==="warlock"){
     const target=highestHpEnemy(actor);
     if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,2),"命運逆轉",false);
-    heal(actor,scaled(BASE_HEAL,.5));
+    heal(actor,scaled(BASE_HEAL,.7));
   }
 }
 
@@ -737,8 +922,14 @@ function dealDamage(actor,target,raw,label,log=true){
   return dealt;
 }
 
-function highestHpEnemy(actor){return state.players.filter(p=>p.alive&&p.id!==actor.id).sort((a,b)=>b.hp-a.hp)[0]||null}
-function lowestHpEnemy(actor){return state.players.filter(p=>p.alive&&p.id!==actor.id).sort((a,b)=>a.hp-b.hp)[0]||null}
+function highestHpEnemy(actor){return randomTiedLocal(state.players.filter(p=>p.alive&&p.id!==actor.id),p=>p.hp,"max")}
+function lowestHpEnemy(actor){return randomTiedLocal(state.players.filter(p=>p.alive&&p.id!==actor.id),p=>p.hp,"min")}
+function randomTiedLocal(list,getter,mode){
+  if(!list.length)return null;
+  const best=mode==="max"?Math.max(...list.map(getter)):Math.min(...list.map(getter));
+  const tied=list.filter(x=>getter(x)===best);
+  return tied[Math.floor(Math.random()*tied.length)]||null;
+}
 
 function playerEl(id){return document.querySelector(`[data-player-id="${id}"]`)}
 function showActionStage(){$("#actionStage").classList.add("show");$("#formulaZone").classList.add("resolving")}
@@ -767,8 +958,11 @@ function buildEffectSummary(actor,action,before){
   if(actor.classId==="warlock"&&action==="heal")parts.push("增益持續 2 回合");
   return parts.join("｜")||ACTION_META[action]?.label||"";
 }
-async function showUltimateOverlay(){
+async function showUltimateOverlay(classId){
   const overlay=$("#ultimateOverlay");
+  const img=overlay.querySelector("img");
+  img.src=`./assets/images/ultimate-${classId}.png`;
+  img.alt=CLASSES[classId]?.ultimate||"絕招";
   overlay.classList.add("show");
   overlay.setAttribute("aria-hidden","false");
   await wait(2000);
@@ -817,4 +1011,4 @@ $("#parenBtn").onclick=()=>{
   state.parenMode=!state.parenMode;state.parenSelection=[];$("#parenBtn").classList.toggle("active",state.parenMode);$("#parenHint").textContent="";
 };
 $("#submitBtn").onclick=submitAnswer;
-$("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);renderRooms();showScreen("lobby")};
+$("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);clearInterval(state.battlePoll);renderRooms();showScreen("lobby")};
