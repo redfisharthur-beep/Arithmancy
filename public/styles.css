@@ -24,9 +24,10 @@ button{color:inherit}
   width:100%;
   min-height:100dvh;
   padding:18px;
-  background-size:cover;
+  background-size:100% 100%;
   background-position:center;
-  background-attachment:fixed;
+  background-repeat:no-repeat;
+  background-attachment:scroll;
 }
 .screen.active{display:flex}
 
@@ -101,25 +102,9 @@ button{color:inherit}
 .class-card:not(.selected){opacity:.62;filter:saturate(.72) brightness(.9)}
 .class-card.selected{
   opacity:1;
-  transform:scale(1.045);
-  filter:brightness(1.08) saturate(.95) drop-shadow(0 8px 18px rgba(56,60,55,.28));
+  transform:scale(1.08);
+  filter:brightness(1.16) saturate(1) drop-shadow(0 10px 22px rgba(46,50,46,.42));
   z-index:2;
-}
-.class-card.selected::after{
-  content:"✓";
-  position:absolute;
-  top:8px;
-  right:8px;
-  width:34px;
-  height:34px;
-  display:grid;
-  place-items:center;
-  border-radius:50%;
-  background:#776e62;
-  color:white;
-  font-size:20px;
-  font-weight:600;
-  box-shadow:0 4px 12px rgba(48,51,47,.3);
 }
 .class-art{
   width:100%;
@@ -314,6 +299,28 @@ button{color:inherit}
 }
 
 /* Draggable cards */
+.answer-display{
+  position:absolute;
+  top:16px;
+  left:50%;
+  transform:translateX(-50%);
+  min-width:84px;
+  padding:5px 14px;
+  text-align:center;
+  font-size:34px;
+  font-weight:600;
+  color:#f5f2eb;
+  border-radius:12px;
+  background:rgba(112,119,109,.38);
+  transition:.18s ease;
+}
+.answer-display.matched{
+  box-shadow:inset 0 0 0 2px rgba(101,119,96,.55);
+}
+.answer-display.no-action{
+  color:#725b58;
+  box-shadow:inset 0 0 0 2px rgba(136,104,99,.42);
+}
 .formula-zone{
   min-height:250px;
   flex:1;
@@ -399,7 +406,7 @@ button{color:inherit}
   bottom:0;
   z-index:20;
   display:grid;
-  grid-template-columns:1fr 1fr 1.35fr;
+  grid-template-columns:1fr 1.35fr;
   gap:8px;
   padding:8px 10px calc(8px + env(safe-area-inset-bottom));
   background:rgba(126,133,122,.95);
