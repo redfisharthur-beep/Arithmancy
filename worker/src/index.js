@@ -13,7 +13,7 @@ export class Lobby {
   async fetch(request){
     const url=new URL(request.url);
     const rooms=(await this.state.storage.get("rooms"))||{};
-    const cutoff=Date.now()-30*60*1000;
+    const cutoff=Date.now()-2*60*1000;
     for(const [id,room] of Object.entries(rooms)){
       if((room.updatedAt||0)<cutoff||room.started)delete rooms[id];
     }
@@ -24,7 +24,7 @@ export class Lobby {
     if(request.method==="POST"&&url.pathname.endsWith("/upsert")){
       const room=await request.json();
       if(room?.id){
-        rooms[room.id]={...room,updatedAt:Date.now()};
+        rooms[room.id]={...room,updatedAt:room.updatedAt||Date.now()};
         if(room.started)delete rooms[room.id];
         await this.state.storage.put("rooms",rooms);
       }
@@ -85,6 +85,26 @@ export class Room {
       await this.saveRoom(room);await this.publish(room);
       this.broadcast({type:"roomState",room});
       return Response.json({room});
+    }
+
+    if(request.method==="POST"&&url.pathname.endsWith("/leave")){
+      const body=await request.json();
+      const room=await this.getRoom();
+      if(!room||room.started)return Response.json({ok:true,room});
+      room.players=room.players.filter(p=>p.id!==body.playerId);
+      if(room.players.length===0){
+        await this.state.storage.delete("room");
+        await this.removeFromLobby(room.id);
+        return Response.json({ok:true,room:null});
+      }
+      if(room.ownerId===body.playerId){
+        room.ownerId=room.players[0].id;
+        room.owner=room.players[0].name;
+      }
+      room.updatedAt=Date.now();
+      await this.saveRoom(room);await this.publish(room);
+      this.broadcast({type:"roomState",room});
+      return Response.json({ok:true,room});
     }
 
     if(request.method==="POST"&&url.pathname.endsWith("/start")){
@@ -177,6 +197,15 @@ export class Room {
         id:room.id,owner:room.owner,players:room.players.length,max:room.max,
         createdAt:room.createdAt,updatedAt:room.updatedAt,started:room.started
       })
+    });
+  }
+
+  async removeFromLobby(roomId){
+    const lobbyId=this.env.LOBBY.idFromName("global");
+    const lobby=this.env.LOBBY.get(lobbyId);
+    await lobby.fetch("https://lobby.internal/remove",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({id:roomId})
     });
   }
 
@@ -345,14 +374,14 @@ function applyAction(battle,actor,action){
 
 function applyUltimate(battle,actor){
   const enemies=battle.players.filter(p=>p.alive&&p.id!==actor.id);
-  if(actor.classId==="warrior"){actor.guardCharges+=2;return [actor.id]}
+  if(actor.classId==="warrior"){actor.guardCharges=Math.min(2,(actor.guardCharges||0)+2);return [actor.id]}
   if(actor.classId==="mage"){
     const highest=randomTied(enemies,p=>p.hp,"max");
     for(const t of enemies)dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8));
     return enemies.map(p=>p.id);
   }
   if(actor.classId==="priest"){
-    heal(actor,scaled(BASE_HEAL,2.5),actor);actor.guardCharges+=1;return [actor.id];
+    heal(actor,scaled(BASE_HEAL,2.5),actor);actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
   }
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(battle,actor);
@@ -493,7 +522,7 @@ function evaluateFormula(formula){
     while(i<safe.length&&/[0-9.]/.test(safe[i]))i++;
     if(start===i)return null;
     const token=safe.slice(start,i);
-    if(!/^\\d+(?:\\.\\d+)?$/.test(token))return null;
+    if(!/^\d+(?:\.\d+)?$/.test(token))return null;
     const n=Number(token);
     return Number.isFinite(n)?n:null;
   };
@@ -610,7 +639,7 @@ export default {
       });
     }
 
-    const match=url.pathname.match(/^\/api\/rooms\/([^/]+)\/(state|join|start|submit)$/);
+    const match=url.pathname.match(/^\/api\/rooms\/([^/]+)\/(state|join|leave|start|submit)$/);
     if(match){
       const [,roomId,action]=match;
       const id=env.ROOMS.idFromName(roomId);
