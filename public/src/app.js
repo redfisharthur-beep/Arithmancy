@@ -13,6 +13,38 @@ const state={
 };
 sessionStorage.setItem("arithmancyClientId",state.clientId);
 
+const isCoarsePointer=()=>window.matchMedia?.("(pointer: coarse)")?.matches;
+const isPortrait=()=>window.matchMedia?.("(orientation: portrait)")?.matches;
+
+function syncOrientationGate(){
+  const gate=$("#orientationGate");
+  if(!gate)return;
+  const block=isCoarsePointer()&&isPortrait();
+  gate.classList.toggle("show",block);
+  gate.setAttribute("aria-hidden",block?"false":"true");
+}
+
+async function tryLockLandscape(){
+  if(!isCoarsePointer())return;
+  try{
+    if(document.documentElement.requestFullscreen&&!document.fullscreenElement){
+      await document.documentElement.requestFullscreen({navigationUI:"hide"});
+    }
+  }catch{}
+  try{
+    if(screen.orientation?.lock){
+      await screen.orientation.lock("landscape");
+    }
+  }catch{}
+  syncOrientationGate();
+}
+
+window.addEventListener("resize",syncOrientationGate);
+window.addEventListener("orientationchange",()=>setTimeout(syncOrientationGate,150));
+document.addEventListener("fullscreenchange",syncOrientationGate);
+syncOrientationGate();
+
+
 const CLASSES={
   warrior:{name:"戰士",specialty:"防禦",ultimate:"絕對壁壘"},
   mage:{name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴"},
@@ -634,9 +666,9 @@ function showResults(){
 }
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 
-$("#fightBtn").onclick=()=>{const name=$("#playerName").value.trim();if(!name)return $("#playerName").focus();state.playerName=name;renderClasses();renderRooms();showScreen("lobby")};
+$("#fightBtn").onclick=async()=>{const name=$("#playerName").value.trim();if(!name)return $("#playerName").focus();await tryLockLandscape();state.playerName=name;renderClasses();renderRooms();showScreen("lobby")};
 $("#createRoomBtn").onclick=createHumanRoom;
-$("#waitingFightBtn").onclick=hostStartFight;
+$("#waitingFightBtn").onclick=async()=>{await tryLockLandscape();hostStartFight()};
 $("#leaveRoomBtn").onclick=leaveWaitingRoom;
 $("#parenBtn").onclick=()=>{
   if(state.submitted||state.roundLocked)return;
