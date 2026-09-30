@@ -121,8 +121,15 @@ async function syncHumanBattle(battle,initial=false){
   state.round=battle.round;
   state.roundEndsAt=battle.roundEndsAt||0;
   state.targets=battle.targets||[];
-  state.cards=(battle.cards||[]).map(c=>({...c}));
-  state.originalCards=state.cards.map(c=>({...c}));
+
+  // The server owns the dealt cards, but the player owns their local order.
+  // Polling must never overwrite a drag/reorder within the same round.
+  const isNewRound=initial||state.renderedServerRound!==battle.round;
+  if(isNewRound){
+    state.cards=(battle.cards||[]).map(c=>({...c}));
+    state.originalCards=state.cards.map(c=>({...c}));
+  }
+
   state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
 
   const me=state.players.find(p=>p.id===state.clientId);
@@ -133,7 +140,7 @@ async function syncHumanBattle(battle,initial=false){
   renderPlayers();
 
   if(battle.phase==="question"){
-    if(initial||state.renderedServerRound!==battle.round){
+    if(isNewRound){
       state.renderedServerRound=battle.round;
       state.parenRange=null;state.parenSelection=[];state.parenMode=false;
       renderCards();updateFormula();hideActionStage();
@@ -711,6 +718,8 @@ async function submitAnswer(){
         $("#submitBtn").disabled=false;
         $("#submitBtn").classList.remove("submitted");
         $("#answerDisplay")?.classList.remove("submitted");
+        console.error("submit failed",data);
+        alert(`答案無法送出：${data.error||`HTTP_${res.status}`}`);
         return;
       }
       if(data.room?.battle)await syncHumanBattle(data.room.battle,false);
