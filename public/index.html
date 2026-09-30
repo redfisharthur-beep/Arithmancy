@@ -60,8 +60,16 @@
       <section class="formula-zone" id="formulaZone">
         <div class="battle-flash" id="battleFlash"></div>
         <div class="action-stage" id="actionStage">
-          <span id="actionActor"></span>
-          <strong id="actionSkill"></strong>
+          <div class="action-card">
+            <img class="action-class-image" id="actionClassImage" alt="">
+            <div class="action-copy">
+              <span id="actionActor"></span>
+              <strong id="actionSkill"></strong>
+              <small id="actionTarget"></small>
+              <div id="actionEffect"></div>
+            </div>
+            <img class="action-main-icon" id="actionMainIcon" alt="">
+          </div>
         </div>
         <div class="answer-display" id="answerDisplay" aria-live="polite">—</div>
         <div class="cards-row" id="cardsRow"></div>
@@ -78,6 +86,10 @@
       </footer>
     </div>
   </section>
+
+  <div class="ultimate-overlay" id="ultimateOverlay" aria-hidden="true">
+    <img src="./assets/images/skill-ultimate.png" alt="絕招">
+  </div>
 
   <section class="screen screen-results" data-screen="results">
     <div class="panel results-panel">
