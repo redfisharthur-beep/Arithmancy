@@ -18,32 +18,34 @@ const state={
   players:[],
   queue:[],
   battleLog:[],
-  roundLocked:false
+  roundLocked:false,
+  ultimateTarget:null,
+  ultimateSolution:null
 };
 
 const CLASSES={
   warrior:{
-    name:"戰士",specialty:"防禦",ultimate:"絕對壁壘",target:24,
+    name:"戰士",specialty:"防禦",ultimate:"絕對壁壘",
     ult:"shieldAll",detail:"護盾大幅提升"
   },
   mage:{
-    name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴",target:36,
+    name:"法師",specialty:"範圍攻擊",ultimate:"元素風暴",
     ult:"aoe",detail:"全體攻擊"
   },
   priest:{
-    name:"牧師",specialty:"恢復",ultimate:"神聖回響",target:18,
+    name:"牧師",specialty:"恢復",ultimate:"神聖回響",
     ult:"fullHeal",detail:"大量恢復"
   },
   ranger:{
-    name:"弓手",specialty:"攻擊",ultimate:"穿心連矢",target:27,
+    name:"弓手",specialty:"攻擊",ultimate:"穿心連矢",
     ult:"multiShot",detail:"連續攻擊"
   },
   assassin:{
-    name:"刺客",specialty:"破防",ultimate:"暗影處決",target:21,
+    name:"刺客",specialty:"破防",ultimate:"暗影處決",
     ult:"execute",detail:"強力破防"
   },
   warlock:{
-    name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉",target:13,
+    name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉",
     ult:"curse",detail:"強化詛咒"
   }
 };
@@ -115,6 +117,9 @@ function beginRound(){
   if(checkBattleEnd())return;
   state.cards=randomSharedCards();
   state.originalCards=state.cards.map(c=>({...c}));
+  const ultimate=pickReachableUltimate(state.originalCards);
+  state.ultimateTarget=ultimate.target;
+  state.ultimateSolution=ultimate.formula;
   state.parenRange=null;
   state.parenSelection=[];
   state.submitted=false;
@@ -122,7 +127,7 @@ function beginRound(){
   state.roundLocked=false;
   state.players.filter(p=>p.alive).forEach(p=>{p.submitted=false;p.submission=null});
   const cls=CLASSES[state.selectedClass];
-  $("#ultimateTarget").textContent=cls.target;
+  $("#ultimateTarget").textContent=state.ultimateTarget;
   $("#ultimateName").textContent=cls.ultimate;
   $("#roundLabel").textContent=`R${state.round}`;
   $("#actionBands").innerHTML=ACTIONS.map(a=>`<span class="band">${a.label} · ${a.name}</span>`).join("");
@@ -186,28 +191,64 @@ function bindCardInteractions(){
 let dragging=null;
 function dragStart(e){
   if(state.parenMode||state.submitted||state.roundLocked)return;
+  e.preventDefault();
   const card=e.currentTarget;
-  dragging={index:Number(card.dataset.index),el:card,pointerId:e.pointerId};
+  dragging={
+    index:Number(card.dataset.index),
+    el:card,
+    pointerId:e.pointerId,
+    x:e.clientX,
+    y:e.clientY
+  };
   card.classList.add("dragging");
-  card.setPointerCapture?.(e.pointerId);
-  card.addEventListener("pointerup",dragEnd,{once:true});
-  card.addEventListener("pointercancel",dragEnd,{once:true});
+  document.addEventListener("pointermove",dragMove,{passive:false});
+  document.addEventListener("pointerup",dragEnd,{once:true});
+  document.addEventListener("pointercancel",dragEnd,{once:true});
+}
+
+function dragMove(e){
+  if(!dragging||e.pointerId!==dragging.pointerId)return;
+  e.preventDefault();
+  dragging.x=e.clientX;
+  dragging.y=e.clientY;
+  const dx=e.clientX-dragging.el.getBoundingClientRect().left-dragging.el.offsetWidth/2;
+  const dy=e.clientY-dragging.el.getBoundingClientRect().top-dragging.el.offsetHeight/2;
+  dragging.el.style.transform=`translate(${dx}px,${dy}px) scale(1.06)`;
+  dragging.el.style.zIndex="20";
 }
 
 function dragEnd(e){
   if(!dragging)return;
+  document.removeEventListener("pointermove",dragMove);
   const source=dragging.index;
-  const targetEl=document.elementFromPoint(e.clientX,e.clientY)?.closest(".card");
-  dragging.el.classList.remove("dragging");
-  if(targetEl){
-    const target=Number(targetEl.dataset.index);
-    if(Number.isInteger(target)&&target!==source){
-      const [moved]=state.cards.splice(source,1);
-      state.cards.splice(target,0,moved);
-      state.parenRange=null;
-      state.parenSelection=[];
-    }
+  const row=$("#cardsRow");
+  const rowRect=row.getBoundingClientRect();
+  let target=source;
+
+  if(e.clientX>=rowRect.left-30&&e.clientX<=rowRect.right+30&&e.clientY>=rowRect.top-40&&e.clientY<=rowRect.bottom+40){
+    const cards=[...row.querySelectorAll(".card")];
+    let best=Infinity;
+    cards.forEach((el,i)=>{
+      if(i===source)return;
+      const rect=el.getBoundingClientRect();
+      const cx=rect.left+rect.width/2;
+      const cy=rect.top+rect.height/2;
+      const d=Math.hypot(e.clientX-cx,e.clientY-cy);
+      if(d<best){best=d;target=i}
+    });
   }
+
+  dragging.el.classList.remove("dragging");
+  dragging.el.style.transform="";
+  dragging.el.style.zIndex="";
+
+  if(target!==source){
+    const [moved]=state.cards.splice(source,1);
+    state.cards.splice(target,0,moved);
+    state.parenRange=null;
+    state.parenSelection=[];
+  }
+
   dragging=null;
   renderCards();
   updateFormula();
@@ -273,7 +314,9 @@ function evaluateFormula(formula){
 function actionFor(value,classId=state.selectedClass){
   if(value===null)return {id:"invalid",name:""};
   const cls=CLASSES[classId];
-  if(value===cls.target)return {id:"ultimate",name:`${cls.ultimate} · 終極絕招`};
+  if(Number.isFinite(state.ultimateTarget)&&Math.abs(value-state.ultimateTarget)<0.0001){
+    return {id:"ultimate",name:`${cls.ultimate} · 終極絕招`};
+  }
   if(value<=0)return {id:"curse",name:"詛咒 · 攻擊血最高"};
   if(value<=9)return {id:"guard",name:"抵擋 · 獲得護盾"};
   if(value<=19)return {id:"heal",name:"恢復"};
@@ -364,6 +407,34 @@ function permutations(arr){
     permutations(rest).forEach(p=>out.push([item,...p]));
   });
   return out;
+}
+
+function allReachableFormulas(cards){
+  const results=[];
+  const seen=new Set();
+  for(const order of permutations(cards)){
+    if(!isValidOrder(order))continue;
+    for(const range of [null,[0,2],[2,4]]){
+      const formula=formulaString(order,range);
+      const value=evaluateFormula(formula);
+      if(value===null||!Number.isFinite(value))continue;
+      const key=`${formula}=${value}`;
+      if(seen.has(key))continue;
+      seen.add(key);
+      results.push({formula,value,usesParen:Boolean(range)});
+    }
+  }
+  return results;
+}
+
+function pickReachableUltimate(cards){
+  const all=allReachableFormulas(cards);
+  const integers=all.filter(x=>Number.isInteger(x.value)&&x.value>=10&&x.value<=60);
+  const parenthesized=integers.filter(x=>x.usesParen);
+  const pool=parenthesized.length?parenthesized:(integers.length?integers:all.filter(x=>Number.isInteger(x.value)&&x.value>0));
+  const choice=pool[Math.floor(Math.random()*pool.length)]||all[0]||{formula:"",value:0};
+  console.debug("[Arithmancy] reachable ultimate",choice.value,choice.formula);
+  return {target:choice.value,formula:choice.formula};
 }
 
 function findBotFormula(classId){
