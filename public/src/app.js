@@ -405,7 +405,7 @@ function actionFor(value,classId=state.selectedClass){
 
 function updateFormula(){
   const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value);
-  $("#formulaText").textContent=formula||"數字 → 符號 → 數字 → 符號 → 數字";
+  $("#formulaText").textContent=formula||"";
   $("#formulaResult").textContent=value===null?"—":value;
   $("#matchedAction").textContent=action.name;
   document.querySelectorAll(".target-chip").forEach(el=>el.classList.toggle("matched",action.id===el.dataset.action));
