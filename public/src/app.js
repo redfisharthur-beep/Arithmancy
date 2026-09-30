@@ -471,6 +471,7 @@ function submitAnswer(){
 }
 
 function scheduleBots(){
+  if(state.roomMode!=="ai")return;
   state.players.filter(p=>p.alive&&!p.isHuman).forEach((bot,i)=>{
     const delay=7000+Math.floor(Math.random()*38000)+i*500;
     setTimeout(()=>{
