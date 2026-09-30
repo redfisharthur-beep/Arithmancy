@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 170">
+<defs><linearGradient id="g" x2="1"><stop stop-color="#7e6536"/><stop offset=".5" stop-color="#d3b76b"/><stop offset="1" stop-color="#80673a"/></linearGradient></defs>
+<path d="M35 30h450l20 55-20 55H35L15 85z" fill="#11140f" stroke="url(#g)" stroke-width="4"/>
+<text x="260" y="103" text-anchor="middle" font-family="Arial, sans-serif" font-size="55" letter-spacing="12" fill="#eadba7">FIGHT</text>
+</svg>
