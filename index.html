@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#141713" />
+  <title>Arithmancy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app">
+    <section class="screen screen-home active" data-screen="home">
+      <div class="home-center">
+        <input id="playerName" class="name-input" maxlength="12" placeholder="輸入名字" autocomplete="off" />
+        <button id="fightBtn" class="image-button fight-button" aria-label="Fight">
+          <img src="./assets/images/buttons/fight.svg" alt="Fight" />
+        </button>
+      </div>
+    </section>
+
+    <section class="screen screen-lobby" data-screen="lobby">
+      <div class="panel lobby-panel">
+        <div class="class-grid" id="classGrid"></div>
+        <div class="lobby-actions">
+          <button id="createRoomBtn" class="soft-button">建立房間</button>
+          <div class="room-list" id="roomList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen screen-battle" data-screen="battle">
+      <div class="battle-shell">
+        <header class="battle-top">
+          <div class="timer" id="timer">30</div>
+          <div class="conditions">
+            <div class="ultimate-condition">
+              <span class="label">絕招</span>
+              <strong id="ultimateTarget">24</strong>
+              <span id="ultimateName">職業絕招</span>
+            </div>
+            <div class="action-bands" id="actionBands"></div>
+          </div>
+        </header>
+
+        <section class="players-strip" id="playersStrip"></section>
+
+        <section class="formula-zone">
+          <div class="formula-preview">
+            <span id="formulaText">請排列卡牌</span>
+            <strong id="formulaResult">—</strong>
+            <span id="matchedAction"></span>
+          </div>
+          <div class="cards-row" id="cardsRow"></div>
+          <div class="paren-hint" id="parenHint"></div>
+        </section>
+
+        <footer class="battle-controls">
+          <button id="parenBtn" class="image-button control-image" aria-label="括號">
+            <img src="./assets/images/buttons/parentheses.svg" alt="括號" />
+          </button>
+          <button id="resetBtn" class="image-button control-image" aria-label="重置">
+            <img src="./assets/images/buttons/reset.svg" alt="重置" />
+          </button>
+          <button id="submitBtn" class="image-button control-image primary" aria-label="送出答案">
+            <img src="./assets/images/buttons/submit.svg" alt="送出答案" />
+          </button>
+        </footer>
+      </div>
+    </section>
+
+    <section class="screen screen-results" data-screen="results">
+      <div class="panel results-panel">
+        <h1>排行榜</h1>
+        <div id="ranking" class="ranking"></div>
+        <button id="backLobbyBtn" class="soft-button">返回大廳</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
