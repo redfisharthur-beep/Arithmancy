@@ -116,7 +116,8 @@ export class Room {
       if(result===null)return Response.json({error:"INVALID_FORMULA"},{status:400});
 
       const hit=battle.targets.find(t=>Math.abs(t.value-result)<0.0001);
-      const actionId=hit?.id||"invalid";
+      let actionId=hit?.id||"invalid";
+      if(actionId==="ultimate"&&(player.ultimates||0)>=2)actionId="invalid";
       const submittedAt=Date.now();
       const secondBucket=Math.max(0,Math.floor((submittedAt-battle.roundStartedAt)/1000));
       player.submitted=true;
@@ -322,6 +323,7 @@ function applyAction(battle,actor,action){
     return [target.id];
   }
   if(action==="ultimate"){
+    if((actor.ultimates||0)>=2)return [];
     actor.ultimates++;
     return applyUltimate(battle,actor);
   }
@@ -342,7 +344,8 @@ function applyUltimate(battle,actor){
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(battle,actor);
     if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,3));
-    return target?[target.id]:[];
+    heal(actor,scaled(BASE_HEAL,.5),actor);
+    return [target?.id,actor.id].filter(Boolean);
   }
   if(actor.classId==="assassin"){
     const target=lowestHpEnemy(battle,actor);
