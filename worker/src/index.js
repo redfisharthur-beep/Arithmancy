@@ -69,7 +69,7 @@ export class Room {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         started: false,
-        max: 4,
+        max: 6,
         players: [{
           id: body.playerId,
           name: String(body.name || "Player").slice(0,12),
@@ -111,6 +111,7 @@ export class Room {
       const body = await request.json();
       const room = await this.getRoom();
       if (!room || room.ownerId !== body.playerId) return Response.json({ error: "NOT_HOST" }, { status: 403 });
+      if (room.players.length < 2 || room.players.length > 6) return Response.json({ error: "PLAYER_COUNT" }, { status: 409 });
       room.started = true;
       room.updatedAt = Date.now();
       await this.state.storage.put("room", room);
