@@ -337,30 +337,49 @@ function renderWaitingRoom(){
 
 async function hostStartFight(){
   if(!state.waitingRoom||!state.isHost)return;
-  if(state.roomMode==="human"&&state.waitingRoom.players.length<2)return;
   if(state.roomMode==="ai"){
     startRoom(state.waitingRoom.id,state.waitingRoom.players,true);
     return;
   }
   try{
+    const stateRes=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/state`,{cache:"no-store"});
+    const stateData=await stateRes.json();
+    if(!stateData.room)throw new Error("ROOM_NOT_FOUND");
+    state.waitingRoom=stateData.room;
+    state.isHost=stateData.room.ownerId===state.clientId;
+    if(!state.isHost)throw new Error("NOT_HOST");
+    if(stateData.room.players.length<2)throw new Error("PLAYER_COUNT");
+
     const res=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/start`,{
       method:"POST",
       headers:{"content-type":"application/json"},
       body:JSON.stringify({playerId:state.clientId})
     });
-    if(!res.ok)throw new Error("start failed");
-    const {room}=await res.json();
-    state.waitingRoom=room;
-    startRoom(room.id,room.players,false,room.battle);
-  }catch{
-    alert("無法開始房間");
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||`HTTP_${res.status}`);
+    state.waitingRoom=data.room;
+    startRoom(data.room.id,data.room.players,false,data.room.battle);
+  }catch(err){
+    console.error("start room failed",err);
+    alert(`無法開始房間：${err.message||"UNKNOWN"}`);
   }
 }
 
-function leaveWaitingRoom(){
+async function leaveWaitingRoom(){
   clearInterval(state.waitingPoll);
   clearInterval(state.battlePoll);
-  state.waitingRoom=null;state.isHost=false;
+  const room=state.waitingRoom;
+  if(room&&state.roomMode==="human"){
+    try{
+      await fetch(`/api/rooms/${encodeURIComponent(room.id)}/leave`,{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({playerId:state.clientId}),
+        keepalive:true
+      });
+    }catch{}
+  }
+  state.waitingRoom=null;state.isHost=false;state.roomId=null;
   renderRooms();showScreen("lobby");
 }
 
@@ -1022,3 +1041,17 @@ $("#parenBtn").onclick=()=>{
 };
 $("#submitBtn").onclick=submitAnswer;
 $("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);clearInterval(state.battlePoll);renderRooms();showScreen("lobby")};
+
+
+window.addEventListener("pagehide",()=>{
+  const room=state.waitingRoom;
+  if(!room||state.roomMode!=="human"||room.started)return;
+  try{
+    fetch(`/api/rooms/${encodeURIComponent(room.id)}/leave`,{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({playerId:state.clientId}),
+      keepalive:true
+    });
+  }catch{}
+});
