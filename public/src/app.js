@@ -37,7 +37,47 @@ const ACTION_META={
 
 const AI_ROOM={id:"AI-001",owner:"訓練模式",players:4,max:6,ai:true};
 
-function showScreen(name){screens.forEach(s=>s.classList.toggle("active",s.dataset.screen===name))}
+const AUDIO={
+  home:new Audio("./assets/audio/bgm-home.mp3.mp3"),
+  battle:new Audio("./assets/audio/bgm-battle.mp3.mp3"),
+  ultimate:new Audio("./assets/audio/sfx-ultimate.mp3.mp3")
+};
+AUDIO.home.loop=true;
+AUDIO.battle.loop=true;
+AUDIO.home.volume=.42;
+AUDIO.battle.volume=.46;
+AUDIO.ultimate.volume=.85;
+
+let activeBgm=null;
+let audioUnlocked=false;
+
+function desiredBgmForScreen(name){
+  return name==="battle"?AUDIO.battle:AUDIO.home;
+}
+
+function playBgmForScreen(name){
+  const next=desiredBgmForScreen(name);
+  if(activeBgm===next&&!next.paused)return;
+  if(activeBgm&&activeBgm!==next)activeBgm.pause();
+  activeBgm=next;
+  if(!audioUnlocked)return;
+  next.play().catch(()=>{});
+}
+
+function unlockAudio(){
+  if(audioUnlocked)return;
+  audioUnlocked=true;
+  const active=screens.find(x=>x.classList.contains("active"))?.dataset.screen||"home";
+  playBgmForScreen(active);
+}
+
+document.addEventListener("pointerdown",unlockAudio,{once:true});
+document.addEventListener("keydown",unlockAudio,{once:true});
+
+function showScreen(name){
+  screens.forEach(s=>s.classList.toggle("active",s.dataset.screen===name));
+  playBgmForScreen(name);
+}
 
 function renderClasses(){
   $("#classGrid").innerHTML=Object.entries(CLASSES).map(([id,c])=>`
@@ -1069,6 +1109,10 @@ async function showUltimateOverlay(classId){
   const img=overlay.querySelector("img");
   img.src=`./assets/images/ultimate-${classId}.png`;
   img.alt=CLASSES[classId]?.ultimate||"絕招";
+  try{
+    AUDIO.ultimate.currentTime=0;
+    AUDIO.ultimate.play().catch(()=>{});
+  }catch{}
   overlay.classList.add("show");
   overlay.setAttribute("aria-hidden","false");
   await wait(2000);
@@ -1132,3 +1176,5 @@ window.addEventListener("pagehide",()=>{
     });
   }catch{}
 });
+
+playBgmForScreen("home");
