@@ -562,15 +562,25 @@ function evaluateFormula(formula){
   }catch{return null}
 }
 function validateAndEvaluate(formula,cards){
-  const safe=formula.replaceAll(" ","");
-  if(!/^[0-9+\-×÷*/().]+$/.test(safe))return null;
+  if(!formula||!Array.isArray(cards)||cards.length!==5)return null;
+  const safe=String(formula).replaceAll(" ","");
+  if(!/^[0-9+\-−×÷*/().]+$/.test(safe))return null;
+
+  // Parentheses are syntax, not cards. Compare exactly the three numbers and
+  // two operators that were dealt, independent of the player's local order.
   const tokens=safe.match(/\d+|[+\-−×÷*/]/g)||[];
   if(tokens.length!==5)return null;
-  const normalize=x=>x==="-"?"−":x==="*"?"×":x==="/"? "÷":x;
-  const wanted=cards.map(c=>normalize(c.value)).sort().join("|");
-  const got=tokens.map(normalize).sort().join("|");
+  const normalize=x=>x==="-"||x==="−"?"−":x==="*"||x==="×"?"×":x==="/"||x==="÷"?"÷":x;
+  const wanted=cards.map(c=>normalize(String(c.value))).sort().join("|");
+  const got=tokens.map(x=>normalize(String(x))).sort().join("|");
   if(wanted!==got)return null;
-  return evaluateFormula(formula);
+
+  // A valid play must alternate number/operator/number/operator/number after
+  // removing parentheses; this also prevents concatenating two number cards.
+  const sequence=tokens.map(x=>/^[0-9]+$/.test(x)?"number":"op");
+  if(!sequence.every((type,i)=>type===(i%2===0?"number":"op")))return null;
+
+  return evaluateFormula(safe);
 }
 
 function permutations(arr){
