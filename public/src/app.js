@@ -7,8 +7,11 @@ const state={
   playerName:"",selectedClass:"warrior",roomId:null,round:1,seconds:ROUND_SECONDS,
   cards:[],originalCards:[],parenMode:false,parenSelection:[],parenRange:null,
   submitted:false,timerId:null,roundEndsAt:0,players:[],queue:[],battleLog:[],
-  roundLocked:false,targets:[],solutions:{}
+  roundLocked:false,targets:[],solutions:{},
+  clientId:sessionStorage.getItem("arithmancyClientId")||crypto.randomUUID(),
+  waitingRoom:null,isHost:false,roomMode:null,waitingPoll:null
 };
+sessionStorage.setItem("arithmancyClientId",state.clientId);
 
 const CLASSES={
   warrior:{name:"戰士",specialty:"防禦",ultimate:"絕對壁壘"},
@@ -27,11 +30,7 @@ const ACTION_META={
   execute:{label:"尾刀",icon:"⌁"}
 };
 
-const MOCK_ROOMS=[
-  {id:"A-102",owner:"Mika",players:2,max:4},
-  {id:"B-317",owner:"Kai",players:3,max:4},
-  {id:"C-008",owner:"Nora",players:1,max:4}
-];
+const AI_ROOM={id:"AI-001",owner:"AI 訓練房",players:4,max:4,ai:true};
 
 function showScreen(name){screens.forEach(s=>s.classList.toggle("active",s.dataset.screen===name))}
 
@@ -43,28 +42,179 @@ function renderClasses(){
   document.querySelectorAll(".class-card").forEach(btn=>btn.onclick=()=>{state.selectedClass=btn.dataset.class;renderClasses()});
 }
 
-function renderRooms(){
-  $("#roomList").innerHTML=MOCK_ROOMS.map(r=>`
-    <div class="room-item"><span><strong>${r.id}</strong> · ${r.owner} · ${r.players}/${r.max}</span>
-    <button data-room="${r.id}">加入</button></div>`).join("");
-  document.querySelectorAll("[data-room]").forEach(btn=>btn.onclick=()=>startRoom(btn.dataset.room));
+async function renderRooms(){
+  const list=$("#roomList");
+  list.innerHTML=`
+    <div class="room-item ai-room">
+      <span><strong>${AI_ROOM.id}</strong> · ${AI_ROOM.owner}</span>
+      <button data-ai-room>加入</button>
+    </div>
+    <div class="room-loading">讀取真人房間中...</div>`;
+
+  document.querySelector("[data-ai-room]")?.addEventListener("click",joinAIRoom);
+
+  try{
+    const res=await fetch("/api/rooms",{cache:"no-store"});
+    const data=await res.json();
+    const rooms=(data.rooms||[]).filter(r=>!r.started);
+    const humanHtml=rooms.map(r=>`
+      <div class="room-item">
+        <span><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.owner)} · ${r.players}/${r.max}</span>
+        <button data-human-room="${escapeHtml(r.id)}">加入</button>
+      </div>`).join("");
+    list.querySelector(".room-loading")?.remove();
+    if(humanHtml) list.insertAdjacentHTML("beforeend",humanHtml);
+    else list.insertAdjacentHTML("beforeend",'<div class="room-empty">目前沒有真人房間</div>');
+    list.querySelectorAll("[data-human-room]").forEach(btn=>btn.onclick=()=>joinHumanRoom(btn.dataset.humanRoom));
+  }catch{
+    list.querySelector(".room-loading")?.remove();
+    list.insertAdjacentHTML("beforeend",'<div class="room-empty">真人房間暫時無法讀取</div>');
+  }
 }
 
 function makePlayer(id,name,classId,isHuman=false){
   return {id,name,classId,isHuman,hp:100,maxHp:100,guardCharges:0,vulnerability:0,damage:0,healing:0,ultimates:0,alive:true,submitted:false,submission:null};
 }
 
-function startRoom(id){
-  state.roomId=id;state.round=1;
-  state.players=[
-    makePlayer("p1",state.playerName,state.selectedClass,true),
-    makePlayer("p2","Mika","mage"),
-    makePlayer("p3","Kai","assassin"),
-    makePlayer("p4","Nora","priest")
-  ];
+function startRoom(id,roomPlayers=null,aiMode=false){
+  clearInterval(state.waitingPoll);
+  state.roomId=id;state.round=1;state.roomMode=aiMode?"ai":"human";
+  if(aiMode){
+    state.players=[
+      makePlayer(state.clientId,state.playerName,state.selectedClass,true),
+      makePlayer("ai-mage","Mika","mage"),
+      makePlayer("ai-assassin","Kai","assassin"),
+      makePlayer("ai-priest","Nora","priest")
+    ];
+  }else{
+    const src=(roomPlayers||[]).slice(0,4);
+    state.players=src.map((p,i)=>makePlayer(p.id||("human-"+i),p.name,p.classId,p.id===state.clientId));
+    while(state.players.length<2)state.players.push(makePlayer("guest-"+state.players.length,"等待玩家","warrior"));
+    state.players=state.players.filter(p=>p.name!=="等待玩家");
+  }
   state.battleLog=[];
   showScreen("battle");
   beginRound();
+}
+
+async function createHumanRoom(){
+  const id="R-"+Math.random().toString(36).slice(2,6).toUpperCase();
+  try{
+    const res=await fetch("/api/rooms",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({id,playerId:state.clientId,name:state.playerName,classId:state.selectedClass})
+    });
+    if(!res.ok)throw new Error("create failed");
+    const {room}=await res.json();
+    state.isHost=true;state.roomMode="human";
+    enterWaitingRoom(room);
+  }catch{
+    alert("建立房間失敗，請稍後再試");
+  }
+}
+
+async function joinHumanRoom(id){
+  try{
+    const res=await fetch(`/api/rooms/${encodeURIComponent(id)}/join`,{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({playerId:state.clientId,name:state.playerName,classId:state.selectedClass})
+    });
+    if(!res.ok)throw new Error("join failed");
+    const {room}=await res.json();
+    state.isHost=room.ownerId===state.clientId;state.roomMode="human";
+    enterWaitingRoom(room);
+  }catch{
+    alert("房間已滿或已開始");
+    renderRooms();
+  }
+}
+
+function joinAIRoom(){
+  const room={
+    id:AI_ROOM.id,ownerId:state.clientId,owner:state.playerName,max:4,started:false,
+    players:[
+      {id:state.clientId,name:state.playerName,classId:state.selectedClass},
+      {id:"ai-mage",name:"Mika",classId:"mage"},
+      {id:"ai-assassin",name:"Kai",classId:"assassin"},
+      {id:"ai-priest",name:"Nora",classId:"priest"}
+    ]
+  };
+  state.isHost=true;state.roomMode="ai";
+  enterWaitingRoom(room);
+}
+
+function enterWaitingRoom(room){
+  state.waitingRoom=room;
+  renderWaitingRoom();
+  showScreen("waiting");
+  clearInterval(state.waitingPoll);
+  if(state.roomMode==="human"){
+    state.waitingPoll=setInterval(refreshWaitingRoom,1800);
+  }
+}
+
+async function refreshWaitingRoom(){
+  if(!state.waitingRoom||state.roomMode!=="human")return;
+  try{
+    const res=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/state`,{cache:"no-store"});
+    const data=await res.json();
+    if(!data.room)return;
+    state.waitingRoom=data.room;
+    state.isHost=data.room.ownerId===state.clientId;
+    renderWaitingRoom();
+    if(data.room.started){
+      clearInterval(state.waitingPoll);
+      startRoom(data.room.id,data.room.players,false);
+    }
+  }catch{}
+}
+
+function renderWaitingRoom(){
+  const room=state.waitingRoom;if(!room)return;
+  $("#waitingRoomCode").textContent=room.id;
+  $("#waitingCount").textContent=`${room.players.length}/${room.max||4}`;
+  $("#waitingPlayers").innerHTML=room.players.map((p,i)=>`
+    <div class="waiting-player">
+      <span class="seat-no">${i+1}</span>
+      <div><strong>${escapeHtml(p.name)}</strong><small>${CLASSES[p.classId]?.name||"玩家"}</small></div>
+      <span class="host-tag">${p.id===room.ownerId?"HOST":""}</span>
+    </div>`).join("")+
+    Array.from({length:Math.max(0,(room.max||4)-room.players.length)},()=>'<div class="waiting-player empty"><span>等待玩家...</span></div>').join("");
+  $("#waitingFightBtn").style.display=state.isHost?"block":"none";
+  $("#waitingHint").textContent=state.isHost?"等朋友加入後開始":"等待房主開始";
+}
+
+async function hostStartFight(){
+  if(!state.waitingRoom||!state.isHost)return;
+  if(state.roomMode==="ai"){
+    startRoom(state.waitingRoom.id,state.waitingRoom.players,true);
+    return;
+  }
+  try{
+    const res=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/start`,{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({playerId:state.clientId})
+    });
+    if(!res.ok)throw new Error("start failed");
+    const {room}=await res.json();
+    state.waitingRoom=room;
+    startRoom(room.id,room.players,false);
+  }catch{
+    alert("無法開始房間");
+  }
+}
+
+function leaveWaitingRoom(){
+  clearInterval(state.waitingPoll);
+  state.waitingRoom=null;state.isHost=false;
+  renderRooms();showScreen("lobby");
+}
+
+function escapeHtml(value){
+  return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 }
 
 function beginRound(){
@@ -484,7 +634,9 @@ function showResults(){
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 
 $("#fightBtn").onclick=()=>{const name=$("#playerName").value.trim();if(!name)return $("#playerName").focus();state.playerName=name;renderClasses();renderRooms();showScreen("lobby")};
-$("#createRoomBtn").onclick=()=>startRoom("NEW-"+Math.floor(Math.random()*900+100));
+$("#createRoomBtn").onclick=createHumanRoom;
+$("#waitingFightBtn").onclick=hostStartFight;
+$("#leaveRoomBtn").onclick=leaveWaitingRoom;
 $("#parenBtn").onclick=()=>{
   if(state.submitted||state.roundLocked)return;
   if(state.parenRange){state.parenRange=null;state.parenSelection=[];renderCards();updateFormula();return}
@@ -492,4 +644,4 @@ $("#parenBtn").onclick=()=>{
 };
 $("#resetBtn").onclick=resetFormula;
 $("#submitBtn").onclick=submitAnswer;
-$("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);renderRooms();showScreen("lobby")};
+$("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);renderRooms();showScreen("lobby")};
