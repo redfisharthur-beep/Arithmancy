@@ -99,3 +99,30 @@ body{touch-action:manipulation}
   .player-chip{padding-top:5px;padding-bottom:5px}
   .statusline{min-height:10px}
 }
+
+/* Battle hierarchy: players first, timer + five targets second */
+.screen-battle .battle-shell{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto}
+.screen-battle .players-strip{order:1}
+.screen-battle .battle-top{order:2}
+.screen-battle .formula-zone{order:3}
+.screen-battle .battle-controls{order:4}
+.screen-battle .battle-log{font-size:13px;line-height:1.55;width:280px;color:rgba(238,239,229,.78)}
+.screen-battle .battle-log div{padding:1px 0}
+.screen-battle .player-chip .topline{font-size:14px}
+.screen-battle .player-chip .topline span:first-child{font-weight:500}
+.screen-battle .statusline{font-size:11px}
+
+@media (pointer:coarse) and (orientation:landscape){
+  .screen-battle .battle-shell{grid-template-rows:auto auto minmax(0,1fr) auto;gap:6px}
+  .screen-battle .players-strip{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .screen-battle .player-chip{padding:8px 10px}
+  .screen-battle .player-chip .topline{font-size:clamp(11px,1.75vw,14px)}
+  .screen-battle .statusline{font-size:clamp(9px,1.35vw,11px)}
+  .screen-battle .battle-top{grid-template-columns:clamp(62px,7.5vw,82px) 1fr}
+  .screen-battle .battle-log{display:grid;left:12px;top:12px;width:clamp(190px,24vw,280px);font-size:clamp(11px,1.55vw,14px);line-height:1.5}
+  .screen-battle .formula-zone{padding-left:clamp(12px,2vw,22px)}
+}
+
+@media (pointer:coarse) and (orientation:landscape) and (max-height:520px){
+  .screen-battle .battle-log{display:grid;font-size:clamp(10px,1.45vw,12px);width:clamp(170px,22vw,230px)}
+}
