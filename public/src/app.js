@@ -372,6 +372,12 @@ function actionFor(value,classId=state.selectedClass){
 
 function updateFormula(){
   const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value);
+  const answer=$("#answerDisplay");
+  if(answer){
+    answer.textContent=value===null?"—":String(value);
+    answer.classList.toggle("matched",action.id!=="invalid");
+    answer.classList.toggle("no-action",value!==null&&action.id==="invalid");
+  }
   document.querySelectorAll(".target-chip").forEach(el=>el.classList.toggle("matched",action.id===el.dataset.action));
 }
 
@@ -459,10 +465,9 @@ function submitAnswer(){
   const human=state.players.find(p=>p.isHuman);if(!human?.alive)return;
   const formula=formulaString(),result=evaluateFormula(formula),action=actionFor(result,human.classId);
   if(result===null)return flashHint("算式尚未完成");
-  if(action.id==="invalid")return flashHint("答案要命中上方 5 個指定數字");
   state.submitted=true;human.submitted=true;
   human.submission={forfeit:false,formula,result,action,at:Date.now(),elapsed:ROUND_SECONDS-state.seconds};
-  $("#submitBtn").style.opacity=".5";addLog(`${human.name} 完成 · ${human.submission.elapsed}s`);renderPlayers();
+  addLog(`${human.name} 完成 · ${human.submission.elapsed}s`);renderPlayers();updateFormula();
   finalizeRoundWhenReady(false);
 }
 
@@ -492,12 +497,12 @@ function finalizeRoundWhenReady(force){
   const alive=state.players.filter(p=>p.alive);
   if(!force&&alive.some(p=>!p.submitted))return;
   state.roundLocked=true;clearInterval(state.timerId);
-  state.queue=alive.filter(p=>p.submission&&!p.submission.forfeit).sort((a,b)=>a.submission.at-b.submission.at);
+  state.queue=alive.filter(p=>p.submission&&!p.submission.forfeit&&p.submission.action?.id!=="invalid").sort((a,b)=>a.submission.at-b.submission.at);
   resolveQueue();
 }
 
 async function resolveQueue(){
-  $("#submitBtn").style.opacity=".5";showActionStage();
+  showActionStage();
   if(!state.queue.length){showSkillBanner("本題無人行動","");await wait(1600)}
   for(let i=0;i<state.queue.length;i++){
     const actor=state.queue[i];if(!actor.alive)continue;
@@ -625,8 +630,8 @@ function showResults(){
   $("#winnerName").textContent=rows[0]?.name||"";
   $("#ranking").innerHTML=`
     <div class="rank-row header"><span>#</span><span>玩家</span><span>傷害</span><span>恢復</span><span>絕招</span></div>
-    ${rows.map((r,i)=>`<div class="rank-row"><strong>${i+1}</strong><span class="rank-player"><img class="rank-avatar" src="./assets/images/${CLASSES[r.classId].image}" alt=""><span>${r.name} · ${CLASSES[r.classId].name}</span></span><span>${r.damage}</span><span>${r.healing}</span><span>${r.ultimates}</span></div>`).join("")}`;
-  $("#submitBtn").style.opacity="1";showScreen("results");
+    ${rows.map((r,i)=>`<div class="rank-row"><strong>${i+1}</strong><span class="rank-player"><img class="rank-avatar" src="./assets/images/${CLASSES[r.classId].image}" alt=""><span>${r.name}</span></span><span>${r.damage}</span><span>${r.healing}</span><span>${r.ultimates}</span></div>`).join("")}`;
+  showScreen("results");
 }
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 
@@ -639,6 +644,5 @@ $("#parenBtn").onclick=()=>{
   if(state.parenRange){state.parenRange=null;state.parenSelection=[];renderCards();updateFormula();return}
   state.parenMode=!state.parenMode;state.parenSelection=[];$("#parenBtn").classList.toggle("active",state.parenMode);flashHint(state.parenMode?"數字 → 符號 → 數字":"");
 };
-$("#resetBtn").onclick=resetFormula;
 $("#submitBtn").onclick=submitAnswer;
 $("#backLobbyBtn").onclick=()=>{clearInterval(state.timerId);clearInterval(state.waitingPoll);renderRooms();showScreen("lobby")};
