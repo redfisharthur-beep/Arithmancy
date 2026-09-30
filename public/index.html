@@ -1,13 +1,22 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#141713"><title>Arithmancy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+<div id="orientationGate" class="orientation-gate" aria-hidden="true">
+  <div class="rotate-card">
+    <div class="rotate-icon"><span></span></div>
+    <strong>請將裝置橫放</strong>
+    <small>橫向 16:9 遊玩</small>
+  </div>
+</div>
+<div id="gameViewport" class="game-viewport">
+  <div id="gameStage" class="game-stage">
 <main id="app">
   <section class="screen screen-home active" data-screen="home"><div class="home-center">
     <input id="playerName" class="name-input" maxlength="12" placeholder="輸入名字" autocomplete="off">
@@ -59,5 +68,7 @@
     <div id="ranking" class="ranking"></div><button id="backLobbyBtn" class="soft-button">返回大廳</button>
   </div></section>
 </main>
+  </div>
+</div>
 <script type="module" src="./src/app.js"></script>
 </body></html>
