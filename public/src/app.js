@@ -177,7 +177,6 @@ function renderWaitingRoom(){
     <div class="waiting-player">
       <img class="waiting-avatar" src="./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}" alt="">
       <strong>${escapeHtml(p.name)}</strong>
-      <span class="host-tag">${p.id===room.ownerId?"HOST":""}</span>
     </div>`).join("");
   const canStart=state.roomMode==="ai" || room.players.length>=2;
   $("#waitingFightBtn").style.display=state.isHost&&canStart?"block":"none";
@@ -267,7 +266,11 @@ function renderPlayers(){
     const hpPct=Math.max(0,p.hp/p.maxHp*100);
     return `<div class="player-chip ${!p.alive?"dead":""} ${p.isHuman?"self":""}" data-player-id="${p.id}">
       <img class="player-avatar" src="./assets/images/${CLASSES[p.classId].image}" alt="">
-      <div class="topline"><span>${p.name}</span><span>${Math.max(0,p.hp)}</span></div>
+      <div class="topline">
+        <span>${p.name}</span>
+        <span class="player-state">${p.guardCharges>0?"抵擋中":""}</span>
+        <span class="hp-value">${Math.max(0,p.hp)}</span>
+      </div>
       <div class="hpbar"><i style="width:${hpPct}%"></i></div>
     </div>`;
   }).join("");
