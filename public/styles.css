@@ -668,8 +668,9 @@ button{color:inherit}
 
 @media(min-width:1024px){
   .screen-home{
-    background-size:cover;
+    background-size:contain;
     background-position:center center;
     background-repeat:no-repeat;
+    background-color:#f6f1e7;
   }
 }
