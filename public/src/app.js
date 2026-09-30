@@ -136,7 +136,7 @@ async function syncHumanBattle(battle,initial=false){
   state.submitted=Boolean(me?.submitted);
   state.roundLocked=battle.phase!=="question";
   $("#roundLabel").textContent=`Q${battle.round}/${battle.maxRounds||MAX_ROUNDS}`;
-  renderTargets();
+  if(isNewRound)renderTargets();
   renderPlayers();
 
   if(battle.phase==="question"){
@@ -448,18 +448,45 @@ function renderTargets(){
 }
 
 function renderPlayers(){
-  $("#playersStrip").innerHTML=state.players.map(p=>{
+  const strip=$("#playersStrip");
+  const ids=new Set(state.players.map(p=>String(p.id)));
+
+  // Remove only players that actually disappeared. Reusing existing DOM nodes
+  // keeps avatar images decoded and prevents multiplayer polling from flashing.
+  [...strip.querySelectorAll(".player-chip")].forEach(el=>{
+    if(!ids.has(el.dataset.playerId))el.remove();
+  });
+
+  state.players.forEach(p=>{
+    const id=String(p.id);
     const hpPct=Math.max(0,p.hp/p.maxHp*100);
-    return `<div class="player-chip ${!p.alive?"dead":""} ${p.isHuman?"self":""}" data-player-id="${p.id}">
-      <img class="player-avatar" src="./assets/images/${CLASSES[p.classId].image}" alt="">
-      <div class="topline">
-        <span>${p.name}</span>
-        <span class="player-state">${p.guardCharges>0?"抵擋中":""}</span>
-        <span class="hp-value">${Math.max(0,p.hp)}</span>
-      </div>
-      <div class="hpbar"><i style="width:${hpPct}%"></i></div>
-    </div>`;
-  }).join("");
+    let el=[...strip.children].find(node=>node.dataset?.playerId===id);
+    if(!el){
+      el=document.createElement("div");
+      el.className="player-chip";
+      el.dataset.playerId=id;
+      el.innerHTML=`
+        <img class="player-avatar" alt="">
+        <div class="topline">
+          <span class="player-name"></span>
+          <span class="player-state"></span>
+          <span class="hp-value"></span>
+        </div>
+        <div class="hpbar"><i></i></div>`;
+      strip.appendChild(el);
+    }
+
+    el.classList.toggle("dead",!p.alive);
+    el.classList.toggle("self",Boolean(p.isHuman));
+    const img=el.querySelector(".player-avatar");
+    const src=`./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}`;
+    if(img.getAttribute("src")!==src)img.src=src;
+    el.querySelector(".player-name").textContent=p.name;
+    el.querySelector(".player-state").textContent=p.guardCharges>0?"抵擋中":"";
+    el.querySelector(".hp-value").textContent=Math.max(0,p.hp);
+    el.querySelector(".hpbar i").style.width=`${hpPct}%`;
+    strip.appendChild(el);
+  });
 }
 
 function renderCards(){
