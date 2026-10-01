@@ -45,7 +45,11 @@ const ACTION_META={
   execute:{label:"尾刀",image:"skill-execute.png"}
 };
 
-const AI_ROOM={id:"AI-001",owner:"訓練房",players:0,max:6,ai:true};
+const TRAINING_ROOMS=[
+  {id:"TRAINING-01",name:"演武堂",max:6},
+  {id:"TRAINING-02",name:"藏經閣",max:6},
+  {id:"TRAINING-03",name:"渡劫台",max:6}
+];
 
 const AUDIO={
   home:new Audio("./assets/audio/bgm-home.mp3.mp3"),
@@ -99,30 +103,46 @@ function renderClasses(){
 
 async function renderRooms(){
   const list=$("#roomList");
-  list.innerHTML=`
-    <div class="room-item ai-room">
-      <span><strong>${AI_ROOM.owner}</strong></span>
-      <button data-ai-room>加入</button>
-    </div>
-    <div class="room-loading">讀取房間中...</div>`;
-
-  document.querySelector("[data-ai-room]")?.addEventListener("click",joinAIRoom);
+  list.innerHTML='<div class="room-loading">讀取房間中...</div>';
 
   try{
-    const res=await fetch("/api/rooms",{cache:"no-store"});
-    const data=await res.json();
+    const [roomsRes,...trainingStateResponses]=await Promise.all([
+      fetch("/api/rooms",{cache:"no-store"}),
+      ...TRAINING_ROOMS.map(room=>fetch(`/api/rooms/${encodeURIComponent(room.id)}/state`,{cache:"no-store"}))
+    ]);
+    const data=await roomsRes.json();
     const rooms=(data.rooms||[]).filter(r=>!r.started);
-    const humanHtml=rooms.filter(r=>r.id!==AI_ROOM.id).map(r=>`
+    const trainingStates=await Promise.all(trainingStateResponses.map(async res=>{
+      try{return (await res.json()).room||null}catch{return null}
+    }));
+
+    const trainingHtml=TRAINING_ROOMS.map((config,index)=>{
+      const room=trainingStates[index];
+      const available=!room || (room.training&&room.battle?.ended) || (!room.started&&room.players.length<room.max);
+      if(!available)return "";
+      return `
+        <div class="room-item ai-room">
+          <span><strong>${config.name}</strong></span>
+          <button data-training-room="${config.id}">加入</button>
+        </div>`;
+    }).join("");
+
+    const trainingIds=new Set(TRAINING_ROOMS.map(room=>room.id));
+    const humanHtml=rooms.filter(r=>!trainingIds.has(r.id)).map(r=>`
       <div class="room-item">
         <span><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.owner)} · ${r.players}/${r.max}</span>
         <button data-human-room="${escapeHtml(r.id)}">加入</button>
       </div>`).join("");
-    list.querySelector(".room-loading")?.remove();
-    if(humanHtml) list.insertAdjacentHTML("beforeend",humanHtml);
+
+    list.innerHTML=trainingHtml+humanHtml;
+    if(!list.innerHTML.trim())list.innerHTML='<div class="room-empty">目前沒有可加入的房間</div>';
+
+    list.querySelectorAll("[data-training-room]").forEach(btn=>{
+      btn.onclick=()=>joinTrainingRoom(btn.dataset.trainingRoom);
+    });
     list.querySelectorAll("[data-human-room]").forEach(btn=>btn.onclick=()=>joinHumanRoom(btn.dataset.humanRoom));
   }catch{
-    list.querySelector(".room-loading")?.remove();
-    list.insertAdjacentHTML("beforeend",'<div class="room-empty">房間暫時無法讀取</div>');
+    list.innerHTML='<div class="room-empty">房間暫時無法讀取</div>';
   }
 }
 
@@ -351,36 +371,62 @@ async function joinHumanRoom(id){
   }
 }
 
-async function joinAIRoom(){
+async function joinTrainingRoom(roomId){
+  const config=TRAINING_ROOMS.find(room=>room.id===roomId);
+  if(!config)return;
+
   try{
-    let stateRes=await fetch(`/api/rooms/${encodeURIComponent(AI_ROOM.id)}/state`,{cache:"no-store"});
+    let stateRes=await fetch(`/api/rooms/${encodeURIComponent(roomId)}/state`,{cache:"no-store"});
     let stateData=await stateRes.json().catch(()=>({}));
     let room=stateData.room;
 
-    if(!room){
-      const createRes=await fetch("/api/rooms",{
-        method:"POST",
-        headers:{"content-type":"application/json"},
-        body:JSON.stringify({
-          id:AI_ROOM.id,
-          playerId:state.clientId,
-          name:state.playerName,
-          classId:state.selectedClass,
-          training:true
-        })
-      });
-      const createData=await createRes.json().catch(()=>({}));
-      if(!createRes.ok)throw new Error(createData.error||"TRAINING_CREATE_FAILED");
-      room=createData.room;
+    const finished=Boolean(room?.training&&room?.battle?.ended);
+    if(!room||finished){
+      if(finished){
+        const resetRes=await fetch(`/api/rooms/${encodeURIComponent(roomId)}/join`,{
+          method:"POST",
+          headers:{"content-type":"application/json"},
+          body:JSON.stringify({
+            playerId:state.clientId,
+            name:state.playerName,
+            classId:state.selectedClass,
+            training:true,
+            trainingName:config.name
+          })
+        });
+        const resetData=await resetRes.json().catch(()=>({}));
+        if(!resetRes.ok)throw new Error(resetData.error||"TRAINING_RESET_FAILED");
+        room=resetData.room;
+      }else{
+        const createRes=await fetch("/api/rooms",{
+          method:"POST",
+          headers:{"content-type":"application/json"},
+          body:JSON.stringify({
+            id:roomId,
+            playerId:state.clientId,
+            name:state.playerName,
+            classId:state.selectedClass,
+            training:true,
+            trainingName:config.name
+          })
+        });
+        const createData=await createRes.json().catch(()=>({}));
+        if(!createRes.ok)throw new Error(createData.error||"TRAINING_CREATE_FAILED");
+        room=createData.room;
+      }
     }else{
-      const joinRes=await fetch(`/api/rooms/${encodeURIComponent(AI_ROOM.id)}/join`,{
+      if(room.started)throw new Error("ROOM_UNAVAILABLE");
+      if(room.players.length>=room.max)throw new Error("ROOM_FULL");
+
+      const joinRes=await fetch(`/api/rooms/${encodeURIComponent(roomId)}/join`,{
         method:"POST",
         headers:{"content-type":"application/json"},
         body:JSON.stringify({
           playerId:state.clientId,
           name:state.playerName,
           classId:state.selectedClass,
-          training:true
+          training:true,
+          trainingName:config.name
         })
       });
       const joinData=await joinRes.json().catch(()=>({}));
@@ -393,7 +439,8 @@ async function joinAIRoom(){
     enterWaitingRoom(room);
   }catch(err){
     console.error("join training room failed",err);
-    alert(err.message==="ROOM_FULL"?"訓練房已滿 6 人":"訓練房目前進行中，請稍後再加入");
+    if(err.message==="ROOM_FULL")alert("此訓練房已額滿");
+    else alert("此訓練房目前無法加入，請選擇其他房間");
     renderRooms();
   }
 }
