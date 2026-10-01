@@ -287,6 +287,19 @@ function serverEventSummary(event,players,actionId,critical=false){
   const names=new Map(players.map(p=>[p.id,p.name]));
   const actor=players.find(p=>p.id===event.actorId);
   const actorName=actor?.name||"玩家";
+  if(actionId==="heal"&&actor?.classId==="warrior"){
+    const amount=critAmount(scaled(BASE_HEAL,.7),critical);
+    return `${actorName} 恢復 ${amount} 2回合`;
+  }
+  if(actionId==="heal"&&actor?.classId==="priest"){
+    const amount=critAmount(scaled(BASE_HEAL,1.5),critical);
+    return `${actorName} 恢復 ${amount} 2回合`;
+  }
+  if(actionId==="attack"&&actor?.classId==="mage"){
+    const targetName=names.get(event.targetIds?.[0])||"目標";
+    const amount=critAmount(scaled(BASE_DAMAGE,.6),critical);
+    return `${actorName} 造成 ${targetName} ${amount} ${critical?"爆擊傷害":"傷害"} 2回合`;
+  }
   const parts=[];
   for(const a of event.after||[]){
     const b=(event.before||[]).find(x=>x.id===a.id);if(!b)continue;
@@ -893,7 +906,7 @@ async function performAnimatedAction(actor,submission,order){
   applyAction(actor,submission,critical);
   renderPlayers();
 
-  const effectText=buildEffectSummary(actor,action,before,critical);
+  const effectText=buildEffectSummary(actor,action,before,critical,targets);
   showActionResult(actor,effectText,critical);
 
   for(const p of state.players){
@@ -948,9 +961,11 @@ function applyAction(actor,submission,critical=false){
   }
 
   if(action==="heal"){
-    if(actor.classId==="warrior") heal(actor,critAmount(scaled(BASE_HEAL,1.5),critical));
-    else if(actor.classId==="priest") heal(actor,critAmount(scaled(BASE_HEAL,2),critical));
-    else if(actor.classId==="warlock"){
+    if(actor.classId==="warrior"){
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.7),critical),sourceId:actor.id});
+    }else if(actor.classId==="priest"){
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,1.5),critical),sourceId:actor.id});
+    }else if(actor.classId==="warlock"){
       heal(actor,critAmount(scaled(BASE_HEAL,.8),critical));
       addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
     }else heal(actor,critAmount(BASE_HEAL,critical));
@@ -960,7 +975,11 @@ function applyAction(actor,submission,critical=false){
   if(action==="attack"){
     const target=highestHpEnemy(actor);
     if(!target)return;
-    const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
+    if(actor.classId==="mage"){
+      addEffect(target,{type:"dot",remaining:2,amount:critAmount(scaled(BASE_DAMAGE,.6),critical),sourceId:actor.id});
+      return;
+    }
+    const mult={warrior:1,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),actor.classId==="warlock"?"詛咒":"攻擊");
     if(actor.classId==="warlock"&&target.alive){
       addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
@@ -1133,7 +1152,20 @@ function showActionResult(actor,text,critical=false){
     effect.appendChild(icon);
   }
 }
-function buildEffectSummary(actor,action,before,critical=false){
+function buildEffectSummary(actor,action,before,critical=false,targets=[]){
+  if(action==="heal"&&actor.classId==="warrior"){
+    const amount=critAmount(scaled(BASE_HEAL,.7),critical);
+    return `${actor.name} 恢復 ${amount} 2回合`;
+  }
+  if(action==="heal"&&actor.classId==="priest"){
+    const amount=critAmount(scaled(BASE_HEAL,1.5),critical);
+    return `${actor.name} 恢復 ${amount} 2回合`;
+  }
+  if(action==="attack"&&actor.classId==="mage"){
+    const target=targets[0];
+    const amount=critAmount(scaled(BASE_DAMAGE,.6),critical);
+    return `${actor.name} 造成 ${target?.name||"目標"} ${amount} ${critical?"爆擊傷害":"傷害"} 2回合`;
+  }
   const parts=[];
   for(const p of state.players){
     const prev=before.get(p.id);if(!prev)continue;
