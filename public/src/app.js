@@ -130,7 +130,7 @@ async function renderRooms(){
     const trainingIds=new Set(TRAINING_ROOMS.map(room=>room.id));
     const humanHtml=rooms.filter(r=>!trainingIds.has(r.id)).map(r=>`
       <div class="room-item">
-        <span><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.owner)} · ${r.players}/${r.max}</span>
+        <span><strong>${escapeHtml(r.owner)}的房間</strong></span>
         <button data-human-room="${escapeHtml(r.id)}">加入</button>
       </div>`).join("");
 
