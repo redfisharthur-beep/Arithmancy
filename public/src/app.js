@@ -972,13 +972,26 @@ function applyAction(actor,submission,critical=false){
     if(actor.classId==="mage"){
       const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
       const lowest=randomTiedLocal(enemies,p=>p.hp,"min");
-      enemies.forEach(t=>dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,t.id===lowest?.id?1.2:.6),critical),"尾刀",false));
+      enemies.forEach(t=>{
+        const mult=t.id===lowest?.id?1.2:.6;
+        if((t.guardCharges||0)>0){
+          t.guardCharges=0;
+          dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),"尾刀",false,true);
+        }else{
+          dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult),critical),"尾刀",false);
+        }
+      });
       return;
     }
     const target=lowestHpEnemy(actor);
     if(!target)return;
     const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
-    dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),"尾刀");
+    if((target.guardCharges||0)>0){
+      target.guardCharges=0;
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),"尾刀",true,true);
+    }else{
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),"尾刀");
+    }
   }
 }
 
@@ -1064,9 +1077,9 @@ function heal(p,amount,source=p){
   return gained;
 }
 
-function dealDamage(actor,target,raw,label,log=true){
+function dealDamage(actor,target,raw,label,log=true,ignoreGuard=false){
   if(!target?.alive)return 0;
-  if(target.guardCharges>0){
+  if(!ignoreGuard&&target.guardCharges>0){
     target.guardCharges--;
     if(log)addLog(`${target.name} 抵擋了 ${label}`);
     return 0;
