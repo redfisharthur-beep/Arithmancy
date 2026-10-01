@@ -674,7 +674,8 @@ function updateFormula(){
   const formula=formulaString(),value=evaluateFormula(formula),action=actionFor(value,me?.classId||state.selectedClass,me);
   const answer=$("#answerDisplay");
   if(answer){
-    answer.textContent=value===null?"—":String(value);
+    answer.textContent=value===null?"":String(value);
+    answer.classList.toggle("empty",value===null);
     answer.classList.toggle("matched",action.id!=="invalid");
     answer.classList.toggle("no-action",value!==null&&action.id==="invalid");
   }
