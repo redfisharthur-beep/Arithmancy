@@ -501,11 +501,11 @@ button{color:inherit}
 }
 #parenBtn{
   border-radius:14px;
-  background:#fff;
+  background:rgba(226,232,229,.96);
 }
 #submitBtn{
   border-radius:14px;
-  background:#fff;
+  background:rgba(235,226,220,.96);
 }
 #submitBtn img{
   max-height:66px;
