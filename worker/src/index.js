@@ -365,8 +365,8 @@ function resolveRound(battle){
     .filter(p=>p.alive&&p.submission&&!p.submission.forfeit&&p.submission.actionId!=="invalid")
     .sort((a,b)=>{
       const sa=a.submission,sb=b.submission;
-      if(sa.secondBucket!==sb.secondBucket)return sa.secondBucket-sb.secondBucket;
-      return sa.tieBreak-sb.tieBreak;
+      if(sa.submittedAt!==sb.submittedAt)return sa.submittedAt-sb.submittedAt;
+      return String(a.id).localeCompare(String(b.id));
     });
 
   const events=[];
