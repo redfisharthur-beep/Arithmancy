@@ -399,12 +399,12 @@ function applyAction(battle,actor,action,critical=false){
   }
   if(action==="heal"){
     if(actor.classId==="warrior"){
-      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.7),critical),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.85),critical),sourceId:actor.id});
     }else if(actor.classId==="priest"){
       addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,1.5),critical),sourceId:actor.id});
     }else if(actor.classId==="warlock"){
       heal(actor,critAmount(scaled(BASE_HEAL,.8),critical),actor);
-      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.6),sourceId:actor.id});
     }else heal(actor,critAmount(BASE_HEAL,critical),actor);
     return [actor.id];
   }
@@ -415,10 +415,10 @@ function applyAction(battle,actor,action,critical=false){
       addEffect(target,{type:"dot",remaining:2,amount:critAmount(scaled(BASE_DAMAGE,.6),critical),sourceId:actor.id});
       return [target.id];
     }
-    const mult={warrior:1,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
+    const mult={warrior:1.2,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical));
     if(actor.classId==="warlock"&&target.alive){
-      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
+      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.6),sourceId:actor.id});
     }
     return [target.id];
   }
@@ -427,7 +427,7 @@ function applyAction(battle,actor,action,critical=false){
       const enemies=battle.players.filter(p=>p.alive&&p.id!==actor.id);
       const lowest=randomTied(enemies,p=>p.hp,"min");
       for(const t of enemies){
-        const mult=t.id===lowest?.id?1.2:.6;
+        const mult=t.id===lowest?.id?1:.4;
         if((t.guardCharges||0)>0){
           t.guardCharges=0;
           dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),{ignoreGuard:true});
@@ -439,7 +439,7 @@ function applyAction(battle,actor,action,critical=false){
     }
     const target=lowestHpEnemy(battle,actor);
     if(!target)return [];
-    const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
+    const mult={warrior:1.3,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
     if((target.guardCharges||0)>0){
       target.guardCharges=0;
       dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),{ignoreGuard:true});
@@ -469,19 +469,19 @@ function applyUltimate(battle,actor,critical=false){
   }
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(battle,actor);
-    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,3),critical));
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.7),critical));
     heal(actor,critAmount(scaled(BASE_HEAL,.5),critical),actor);
     return [target?.id,actor.id].filter(Boolean);
   }
   if(actor.classId==="assassin"){
     const target=lowestHpEnemy(battle,actor);
-    if(target){target.guardCharges=0;dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.5),critical))}
+    if(target){target.guardCharges=0;dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.3),critical))}
     return target?[target.id]:[];
   }
   if(actor.classId==="warlock"){
     const target=highestHpEnemy(battle,actor);
     if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2),critical));
-    heal(actor,critAmount(scaled(BASE_HEAL,.7),critical),actor);
+    heal(actor,critAmount(scaled(BASE_HEAL,.85),critical),actor);
     return [target?.id,actor.id].filter(Boolean);
   }
   return [];
