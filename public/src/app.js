@@ -1178,25 +1178,53 @@ function buildEffectSummary(actor,action,before,critical=false,targets=[]){
   }
   return parts.join("｜")||`${actor.name} 行動完成`;
 }
+let actionOverlayQueue=Promise.resolve();
+
 async function showActionOverlay(actionId,classId){
-  const overlay=$("#ultimateOverlay");
-  const img=overlay.querySelector("img");
-  const isUltimate=actionId==="ultimate";
-  img.src=isUltimate
-    ?`./assets/images/ultimate-${classId}.png`
-    :`./assets/images/${ACTION_META[actionId]?.image||"skill-attack.png"}`;
-  img.alt=isUltimate?(CLASSES[classId]?.ultimate||"絕招"):(ACTION_META[actionId]?.label||"行動");
-  if(isUltimate){
-    try{
-      AUDIO.ultimate.currentTime=0;
-      AUDIO.ultimate.play().catch(()=>{});
-    }catch{}
-  }
-  overlay.classList.add("show");
-  overlay.setAttribute("aria-hidden","false");
-  await wait(2000);
-  overlay.classList.remove("show");
-  overlay.setAttribute("aria-hidden","true");
+  const task=async()=>{
+    const overlay=$("#ultimateOverlay");
+    const img=overlay.querySelector("img");
+    const isUltimate=actionId==="ultimate";
+    const src=isUltimate
+      ?`./assets/images/ultimate-${classId}.png`
+      :`./assets/images/${ACTION_META[actionId]?.image||"skill-attack.png"}`;
+
+    // Always clear the previous visual before loading the next one.
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden","true");
+    img.removeAttribute("src");
+    img.alt="";
+
+    // Preload the exact single image, then reveal it. This avoids a cached
+    // previous action/ultimate frame being visible while the new file loads.
+    await new Promise(resolve=>{
+      const done=()=>resolve();
+      img.onload=done;
+      img.onerror=done;
+      img.src=src;
+      if(img.complete)resolve();
+    });
+
+    img.alt=isUltimate?(CLASSES[classId]?.ultimate||"絕招"):(ACTION_META[actionId]?.label||"行動");
+    if(isUltimate){
+      try{
+        AUDIO.ultimate.currentTime=0;
+        AUDIO.ultimate.play().catch(()=>{});
+      }catch{}
+    }
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden","false");
+    await wait(2000);
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden","true");
+    img.removeAttribute("src");
+    img.alt="";
+  };
+
+  const current=actionOverlayQueue.then(task,task);
+  actionOverlayQueue=current.catch(()=>{});
+  return current;
 }
 async function showUltimateOverlay(classId){
   await showActionOverlay("ultimate",classId);
