@@ -45,7 +45,7 @@ const ACTION_META={
   execute:{label:"尾刀",image:"skill-execute.png"}
 };
 
-const AI_ROOM={id:"AI-001",owner:"訓練模式",players:4,max:6,ai:true};
+const AI_ROOM={id:"AI-001",owner:"訓練房",players:0,max:6,ai:true};
 
 const AUDIO={
   home:new Audio("./assets/audio/bgm-home.mp3.mp3"),
@@ -101,10 +101,10 @@ async function renderRooms(){
   const list=$("#roomList");
   list.innerHTML=`
     <div class="room-item ai-room">
-      <span><strong>${AI_ROOM.owner}</strong></span>
+      <span><strong>${AI_ROOM.owner}</strong> · <span data-training-count>0/${AI_ROOM.max}</span></span>
       <button data-ai-room>加入</button>
     </div>
-    <div class="room-loading">讀取真人房間中...</div>`;
+    <div class="room-loading">讀取房間中...</div>`;
 
   document.querySelector("[data-ai-room]")?.addEventListener("click",joinAIRoom);
 
@@ -112,7 +112,11 @@ async function renderRooms(){
     const res=await fetch("/api/rooms",{cache:"no-store"});
     const data=await res.json();
     const rooms=(data.rooms||[]).filter(r=>!r.started);
-    const humanHtml=rooms.map(r=>`
+    const training=rooms.find(r=>r.id===AI_ROOM.id);
+    const count=list.querySelector("[data-training-count]");
+    if(count&&training)count.textContent=`${training.players}/${training.max}`;
+
+    const humanHtml=rooms.filter(r=>r.id!==AI_ROOM.id).map(r=>`
       <div class="room-item">
         <span><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.owner)} · ${r.players}/${r.max}</span>
         <button data-human-room="${escapeHtml(r.id)}">加入</button>
@@ -122,7 +126,7 @@ async function renderRooms(){
     list.querySelectorAll("[data-human-room]").forEach(btn=>btn.onclick=()=>joinHumanRoom(btn.dataset.humanRoom));
   }catch{
     list.querySelector(".room-loading")?.remove();
-    list.insertAdjacentHTML("beforeend",'<div class="room-empty">真人房間暫時無法讀取</div>');
+    list.insertAdjacentHTML("beforeend",'<div class="room-empty">房間暫時無法讀取</div>');
   }
 }
 
@@ -351,18 +355,51 @@ async function joinHumanRoom(id){
   }
 }
 
-function joinAIRoom(){
-  const room={
-    id:AI_ROOM.id,ownerId:state.clientId,owner:state.playerName,max:4,started:false,
-    players:[
-      {id:state.clientId,name:state.playerName,classId:state.selectedClass},
-      {id:"ai-mage",name:"Mika",classId:"mage"},
-      {id:"ai-assassin",name:"Kai",classId:"assassin"},
-      {id:"ai-priest",name:"Nora",classId:"priest"}
-    ]
-  };
-  state.isHost=true;state.roomMode="ai";
-  enterWaitingRoom(room);
+async function joinAIRoom(){
+  try{
+    let stateRes=await fetch(`/api/rooms/${encodeURIComponent(AI_ROOM.id)}/state`,{cache:"no-store"});
+    let stateData=await stateRes.json().catch(()=>({}));
+    let room=stateData.room;
+
+    if(!room){
+      const createRes=await fetch("/api/rooms",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          id:AI_ROOM.id,
+          playerId:state.clientId,
+          name:state.playerName,
+          classId:state.selectedClass,
+          training:true
+        })
+      });
+      const createData=await createRes.json().catch(()=>({}));
+      if(!createRes.ok)throw new Error(createData.error||"TRAINING_CREATE_FAILED");
+      room=createData.room;
+    }else{
+      const joinRes=await fetch(`/api/rooms/${encodeURIComponent(AI_ROOM.id)}/join`,{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          playerId:state.clientId,
+          name:state.playerName,
+          classId:state.selectedClass,
+          training:true
+        })
+      });
+      const joinData=await joinRes.json().catch(()=>({}));
+      if(!joinRes.ok)throw new Error(joinData.error||"TRAINING_JOIN_FAILED");
+      room=joinData.room;
+    }
+
+    state.isHost=room.ownerId===state.clientId;
+    state.roomMode="human";
+    enterWaitingRoom(room);
+  }catch(err){
+    console.error("join training room failed",err);
+    alert(err.message==="ROOM_FULL"?"訓練房已滿 6 人":"訓練房目前進行中，請稍後再加入");
+    renderRooms();
+  }
 }
 
 function enterWaitingRoom(room){
@@ -398,16 +435,12 @@ function renderWaitingRoom(){
       <img class="waiting-avatar" src="./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}" alt="">
       <strong>${escapeHtml(p.name)}</strong>
     </div>`).join("");
-  const canStart=state.roomMode==="ai" || room.players.length>=2;
+  const canStart=room.training ? room.players.length>=1 : room.players.length>=2;
   $("#waitingFightBtn").style.display=state.isHost&&canStart?"block":"none";
 }
 
 async function hostStartFight(){
   if(!state.waitingRoom||!state.isHost)return;
-  if(state.roomMode==="ai"){
-    startRoom(state.waitingRoom.id,state.waitingRoom.players,true);
-    return;
-  }
   try{
     const stateRes=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/state`,{cache:"no-store"});
     const stateData=await stateRes.json();
