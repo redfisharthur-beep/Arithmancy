@@ -352,6 +352,9 @@ button{color:inherit}
   background:rgba(170,162,179,.72);
   transition:.18s ease;
 }
+.answer-display.empty{
+  visibility:hidden;
+}
 .answer-display.matched{
   box-shadow:inset 0 0 0 2px rgba(101,119,96,.55);
 }
