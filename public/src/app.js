@@ -27,6 +27,16 @@ const CLASSES={
   warlock:{name:"術士",specialty:"增益／詛咒",ultimate:"命運逆轉",image:"warlock.png"}
 };
 
+const CRIT_RATES={
+  warrior:.20,
+  mage:.25,
+  priest:.20,
+  ranger:.30,
+  assassin:.40,
+  warlock:.25
+};
+const CRIT_MULTIPLIER=1.5;
+
 const ACTION_META={
   ultimate:{label:"絕招",image:"skill-ultimate.png"},
   attack:{label:"攻擊／詛咒",image:"skill-attack.png"},
@@ -256,7 +266,7 @@ async function playServerEvents(battle){
 
     state.players=after;
     renderPlayers();
-    showActionResult(actor,serverEventSummary(event,battle.players,event.actionId));
+    showActionResult(actor,serverEventSummary(event,battle.players,event.actionId,Boolean(event.critical)),Boolean(event.critical));
 
     for(const p of after){
       const prev=before.find(x=>x.id===p.id);if(!prev)continue;
@@ -273,7 +283,7 @@ async function playServerEvents(battle){
   state.playingServerEvents=false;
 }
 
-function serverEventSummary(event,players,actionId){
+function serverEventSummary(event,players,actionId,critical=false){
   const names=new Map(players.map(p=>[p.id,p.name]));
   const actor=players.find(p=>p.id===event.actorId);
   const actorName=actor?.name||"玩家";
@@ -283,7 +293,7 @@ function serverEventSummary(event,players,actionId){
     const targetName=names.get(a.id)||"玩家";
     if(a.hp<b.hp){
       const suffix=actor?.classId==="warlock"&&actionId==="attack"?" 2回合":"";
-      parts.push(`${actorName} 造成 ${targetName} ${b.hp-a.hp} 傷害${suffix}`);
+      parts.push(`${actorName} 造成 ${targetName} ${b.hp-a.hp} ${critical?"爆擊傷害":"傷害"}${suffix}`);
     }
     if(a.hp>b.hp){
       const suffix=actor?.classId==="warlock"&&actionId==="heal"?" 2回合":"";
@@ -495,6 +505,7 @@ function renderPlayers(){
 
   state.players.forEach(p=>{
     const id=String(p.id);
+    const hpPct=Math.max(0,p.hp/p.maxHp*100);
     let el=[...strip.children].find(node=>node.dataset?.playerId===id);
     if(!el){
       el=document.createElement("div");
@@ -504,7 +515,8 @@ function renderPlayers(){
         <img class="player-avatar" alt="">
         <span class="player-name"></span>
         <span class="player-state" aria-label="狀態"></span>
-        <span class="hp-value"></span>`;
+        <span class="hp-value"></span>
+        <div class="hpbar"><i></i></div>`;
       strip.appendChild(el);
     }
 
@@ -528,6 +540,7 @@ function renderPlayers(){
     }
     el.querySelector(".player-state").innerHTML=status.join("");
     el.querySelector(".hp-value").textContent=Math.max(0,p.hp);
+    el.querySelector(".hpbar i").style.width=`${hpPct}%`;
     strip.appendChild(el);
   });
 }
@@ -875,12 +888,13 @@ async function performAnimatedAction(actor,submission,order){
   await showActionOverlay(action,actor.classId);
   targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
 
+  const critical=rollCritical(actor,action);
   const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges}]));
-  applyAction(actor,submission);
+  applyAction(actor,submission,critical);
   renderPlayers();
 
-  const effectText=buildEffectSummary(actor,action,before);
-  showActionResult(actor,effectText);
+  const effectText=buildEffectSummary(actor,action,before,critical);
+  showActionResult(actor,effectText,critical);
 
   for(const p of state.players){
     const prev=before.get(p.id);if(!prev)continue;
@@ -908,30 +922,38 @@ function previewTargets(actor,action){
   return [highestHpEnemy(actor)].filter(Boolean);
 }
 
-function applyAction(actor,submission){
+function rollCritical(actor,action){
+  if(action==="guard")return false;
+  return Math.random()<(CRIT_RATES[actor.classId]??.20);
+}
+function critAmount(amount,critical){
+  return critical?Math.round(amount*CRIT_MULTIPLIER):amount;
+}
+
+function applyAction(actor,submission,critical=false){
   const action=submission.action.id;
 
   if(action==="ultimate"){
     if((actor.ultimates||0)>=2)return;
-    applyUltimate(actor);
+    applyUltimate(actor,critical);
     actor.ultimates++;
     addLog(`${actor.name} · ${CLASSES[actor.classId].ultimate}`);
     return;
   }
 
   if(action==="guard"){
-    actor.guardCharges+=1;
+    actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);
     addLog(`${actor.name} · 抵擋 1 次`);
     return;
   }
 
   if(action==="heal"){
-    if(actor.classId==="warrior") heal(actor,scaled(BASE_HEAL,1.5));
-    else if(actor.classId==="priest") heal(actor,scaled(BASE_HEAL,2));
+    if(actor.classId==="warrior") heal(actor,critAmount(scaled(BASE_HEAL,1.5),critical));
+    else if(actor.classId==="priest") heal(actor,critAmount(scaled(BASE_HEAL,2),critical));
     else if(actor.classId==="warlock"){
-      heal(actor,scaled(BASE_HEAL,.8));
+      heal(actor,critAmount(scaled(BASE_HEAL,.8),critical));
       addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
-    }else heal(actor,BASE_HEAL);
+    }else heal(actor,critAmount(BASE_HEAL,critical));
     return;
   }
 
@@ -939,7 +961,7 @@ function applyAction(actor,submission){
     const target=highestHpEnemy(actor);
     if(!target)return;
     const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
-    dealDamage(actor,target,scaled(BASE_DAMAGE,mult),actor.classId==="warlock"?"詛咒":"攻擊");
+    dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),actor.classId==="warlock"?"詛咒":"攻擊");
     if(actor.classId==="warlock"&&target.alive){
       addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
     }
@@ -950,40 +972,40 @@ function applyAction(actor,submission){
     if(actor.classId==="mage"){
       const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
       const lowest=randomTiedLocal(enemies,p=>p.hp,"min");
-      enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===lowest?.id?1.2:.6),"尾刀",false));
+      enemies.forEach(t=>dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,t.id===lowest?.id?1.2:.6),critical),"尾刀",false));
       return;
     }
     const target=lowestHpEnemy(actor);
     if(!target)return;
     const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
-    dealDamage(actor,target,scaled(BASE_DAMAGE,mult),"尾刀");
+    dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),"尾刀");
   }
 }
 
-function applyUltimate(actor){
+function applyUltimate(actor,critical=false){
   const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
 
   if(actor.classId==="warrior"){
-    actor.guardCharges+=2;
+    actor.guardCharges=Math.min(2,(actor.guardCharges||0)+2);
     return;
   }
 
   if(actor.classId==="mage"){
     const highest=randomTiedLocal(enemies,p=>p.hp,"max");
-    enemies.forEach(t=>dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8),"元素風暴",false));
+    enemies.forEach(t=>dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8),critical),"元素風暴",false));
     return;
   }
 
   if(actor.classId==="priest"){
-    heal(actor,scaled(BASE_HEAL,2.5));
-    actor.guardCharges+=1;
+    heal(actor,critAmount(scaled(BASE_HEAL,2.5),critical));
+    actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);
     return;
   }
 
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(actor);
-    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,3),"穿心連矢",false);
-    heal(actor,scaled(BASE_HEAL,.5));
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,3),critical),"穿心連矢",false);
+    heal(actor,critAmount(scaled(BASE_HEAL,.5),critical));
     return;
   }
 
@@ -991,15 +1013,15 @@ function applyUltimate(actor){
     const target=lowestHpEnemy(actor);
     if(target){
       target.guardCharges=0;
-      dealDamage(actor,target,scaled(BASE_DAMAGE,2.5),"暗影處決",false);
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.5),critical),"暗影處決",false);
     }
     return;
   }
 
   if(actor.classId==="warlock"){
     const target=highestHpEnemy(actor);
-    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,2),"命運逆轉",false);
-    heal(actor,scaled(BASE_HEAL,.7));
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2),critical),"命運逆轉",false);
+    heal(actor,critAmount(scaled(BASE_HEAL,.7),critical));
   }
 }
 
@@ -1085,12 +1107,20 @@ function hideActionStage(){
   $("#actionClassImage").removeAttribute("src");
   $("#actionEffect").textContent="";
 }
-function showActionResult(actor,text){
+function showActionResult(actor,text,critical=false){
   showActionStage();
   $("#actionClassImage").src=`./assets/images/${CLASSES[actor.classId].image}`;
-  $("#actionEffect").textContent=text||`${actor.name} 行動完成`;
+  const effect=$("#actionEffect");
+  effect.textContent=text||`${actor.name} 行動完成`;
+  if(critical){
+    const icon=document.createElement("img");
+    icon.className="critical-result-icon";
+    icon.src="./assets/images/Critical%20hit.png";
+    icon.alt="爆擊";
+    effect.appendChild(icon);
+  }
 }
-function buildEffectSummary(actor,action,before){
+function buildEffectSummary(actor,action,before,critical=false){
   const parts=[];
   for(const p of state.players){
     const prev=before.get(p.id);if(!prev)continue;
@@ -1098,7 +1128,7 @@ function buildEffectSummary(actor,action,before){
     const guardDiff=p.guardCharges-prev.guard;
     if(hpDiff<0){
       const suffix=actor.classId==="warlock"&&action==="attack"?" 2回合":"";
-      parts.push(`${actor.name} 造成 ${p.name} ${-hpDiff} 傷害${suffix}`);
+      parts.push(`${actor.name} 造成 ${p.name} ${-hpDiff} ${critical?"爆擊傷害":"傷害"}${suffix}`);
     }
     if(hpDiff>0){
       const suffix=actor.classId==="warlock"&&action==="heal"?" 2回合":"";
