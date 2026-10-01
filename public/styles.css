@@ -208,7 +208,7 @@ button{color:inherit}
 
 /* Battle */
 .screen-battle{
-  padding:10px 10px calc(92px + env(safe-area-inset-bottom));
+  padding:10px 10px calc(68px + env(safe-area-inset-bottom));
 }
 .battle-shell{
   width:100%;
@@ -224,9 +224,9 @@ button{color:inherit}
   gap:7px;
 }
 .player-chip{
-  min-height:76px;
+  min-height:98px;
   display:grid;
-  grid-template-columns:66px minmax(92px,1fr) minmax(110px,auto) 52px;
+  grid-template-columns:84px minmax(92px,1fr) minmax(110px,auto) 52px;
   grid-template-rows:auto 10px;
   align-items:center;
   column-gap:10px;
@@ -242,8 +242,8 @@ button{color:inherit}
 .player-chip.dead{opacity:.34;filter:grayscale(1)}
 .player-avatar{
   grid-row:1/3;
-  width:62px;
-  height:62px;
+  width:80px;
+  height:80px;
   border-radius:12px;
   object-fit:contain;
   object-position:center;
@@ -265,8 +265,8 @@ button{color:inherit}
   flex-wrap:wrap;
 }
 .status-icon{
-  width:32px;
-  height:32px;
+  width:36px;
+  height:36px;
   object-fit:contain;
   flex:0 0 auto;
 }
@@ -383,8 +383,8 @@ button{color:inherit}
   box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 5px 14px rgba(54,58,53,.2);
 }
 .formula-zone{
-  min-height:250px;
-  flex:1;
+  min-height:170px;
+  flex:0 0 auto;
   border:1px solid var(--line);
   border-radius:18px;
   background:rgba(198,191,174,.88);
@@ -392,7 +392,7 @@ button{color:inherit}
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:16px 10px;
+  padding:58px 10px 10px;
   position:relative;
   overflow:hidden;
 }
@@ -484,7 +484,7 @@ button{color:inherit}
   display:grid;
   grid-template-columns:1fr 1.35fr;
   gap:8px;
-  padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  padding:4px 10px calc(4px + env(safe-area-inset-bottom));
   background:rgba(143,135,154,.94);
   border-top:1px solid var(--line);
   backdrop-filter:blur(8px);
@@ -492,7 +492,7 @@ button{color:inherit}
 .control-image{width:100%}
 .control-image img{
   width:100%;
-  max-height:72px;
+  max-height:48px;
   object-fit:contain;
 }
 #parenBtn{
@@ -504,8 +504,8 @@ button{color:inherit}
   background:rgba(158,129,126,.38);
 }
 #submitBtn img{
-  max-height:92px;
-  transform:scale(1.12);
+  max-height:56px;
+  transform:none;
 }
 #submitBtn:disabled,
 #submitBtn.submitted{
@@ -648,16 +648,16 @@ button{color:inherit}
 
 @media(min-width:700px){
   .screen{padding:24px}
-  .screen-battle{padding-bottom:110px}
+  .screen-battle{padding-bottom:78px}
   .battle-shell{max-width:680px}
   .class-grid{grid-template-columns:repeat(3,1fr)}
   .class-card{height:230px}
   .waiting-player{min-height:168px;grid-template-columns:148px 1fr}
   .waiting-avatar{width:144px;height:144px}
-  .player-chip{min-height:88px;grid-template-columns:76px minmax(120px,1fr) minmax(110px,auto) 64px}
-  .player-avatar{width:72px;height:72px}
-  .player-name{font-size:20px}
-  .status-icon{width:38px;height:38px}
+  .player-chip{min-height:116px;grid-template-columns:96px minmax(120px,1fr) minmax(120px,auto) 64px}
+  .player-avatar{width:92px;height:92px}
+  .player-name{font-size:21px}
+  .status-icon{width:42px;height:42px}
   .hp-value{font-size:22px}
   .action-result{font-size:36px}
   .critical-result-icon{width:54px;height:54px}
@@ -679,7 +679,7 @@ button{color:inherit}
   .rank-player{gap:10px;font-size:26px}
   .rank-player-name{font-size:22px}
   .rank-avatar{width:112px;height:112px}
-  .formula-zone{min-height:310px}
+  .formula-zone{min-height:190px}
   .battle-controls{
     left:50%;
     right:auto;
