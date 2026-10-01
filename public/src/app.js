@@ -248,7 +248,6 @@ async function playServerEvents(battle){
 
   const events=battle.events||[];
   if(!events.length){
-    $("#actionClassImage").removeAttribute("src");
     $("#actionEffect").textContent="本題無人行動";
     await wait(1200);
     hideActionStage();
@@ -878,7 +877,6 @@ async function resolveQueue(){
   showActionStage();
   if(!state.queue.length){
     showActionStage();
-    $("#actionClassImage").removeAttribute("src");
     $("#actionEffect").textContent="本題無人行動";
     await wait(1600);
   }
@@ -1129,19 +1127,15 @@ function randomTiedLocal(list,getter,mode){
 function playerEl(id){return document.querySelector(`[data-player-id="${id}"]`)}
 function showActionStage(){
   $("#actionStage").classList.add("show");
-  $("#formulaZone").classList.add("resolving");
   $(".battle-shell")?.classList.add("resolving-actions");
 }
 function hideActionStage(){
   $("#actionStage").classList.remove("show");
-  $("#formulaZone").classList.remove("resolving");
   $(".battle-shell")?.classList.remove("resolving-actions");
-  $("#actionClassImage").removeAttribute("src");
   $("#actionEffect").textContent="";
 }
 function showActionResult(actor,text,critical=false){
   showActionStage();
-  $("#actionClassImage").src=`./assets/images/${CLASSES[actor.classId].image}`;
   const effect=$("#actionEffect");
   effect.textContent=text||`${actor.name} 行動完成`;
   if(critical){
