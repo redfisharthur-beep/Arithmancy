@@ -527,15 +527,17 @@ button{color:inherit}
 .winner{
   display:flex;
   align-items:center;
+  justify-content:center;
   gap:18px;
   margin-bottom:22px;
+  text-align:center;
 }
 .winner-logo{
   width:160px;
   height:auto;
   max-height:86px;
   object-fit:contain;
-  object-position:left center;
+  object-position:center center;
   flex:0 0 auto;
 }
 .winner strong{
