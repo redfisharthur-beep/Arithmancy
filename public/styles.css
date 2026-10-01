@@ -226,7 +226,7 @@ button{color:inherit}
 .player-chip{
   min-height:112px;
   display:grid;
-  grid-template-columns:94px minmax(92px,1fr) minmax(110px,auto) 52px;
+  grid-template-columns:94px minmax(86px,1fr) minmax(72px,auto) 44px;
   grid-template-rows:auto 10px;
   align-items:center;
   column-gap:10px;
@@ -271,15 +271,18 @@ button{color:inherit}
   flex:0 0 auto;
 }
 .hp-value{
+  min-width:0;
   text-align:right;
-  font-size:20px;
+  font-size:17px;
   font-weight:700;
+  white-space:nowrap;
 }
 .player-chip .hpbar{
   grid-column:2/5;
   grid-row:2;
-  width:100%;
-  height:10px;
+  width:calc(100% - 6px);
+  justify-self:start;
+  height:8px;
   background:#757d74;
   border-radius:999px;
   overflow:hidden;
@@ -658,7 +661,7 @@ button{color:inherit}
   .player-avatar{width:104px;height:104px}
   .player-name{font-size:21px}
   .status-icon{width:38px;height:38px}
-  .hp-value{font-size:22px}
+  .hp-value{font-size:20px}
   .action-result{font-size:42px}
   .critical-result-icon{width:54px;height:54px}
   .battle-top{grid-auto-rows:102px}
@@ -762,4 +765,18 @@ button{color:inherit}
 .players-strip + .action-stage.show .action-card{
   border-top-left-radius:0;
   border-top-right-radius:0;
+}
+
+@media(max-width:600px){
+  .player-chip{
+    grid-template-columns:94px minmax(76px,1fr) minmax(64px,auto) 40px;
+    column-gap:8px;
+    padding-left:8px;
+    padding-right:8px;
+  }
+  .hp-value{font-size:16px}
+  .player-chip .hpbar{
+    width:calc(100% - 10px);
+    height:8px;
+  }
 }
