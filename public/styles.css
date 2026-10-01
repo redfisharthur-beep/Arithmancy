@@ -495,7 +495,7 @@ button{color:inherit}
 .control-image{width:100%}
 .control-image img{
   width:100%;
-  max-height:48px;
+  max-height:54px;
   object-fit:contain;
 }
 #parenBtn{
@@ -507,7 +507,7 @@ button{color:inherit}
   background:rgba(158,129,126,.38);
 }
 #submitBtn img{
-  max-height:56px;
+  max-height:62px;
   transform:none;
 }
 #submitBtn:disabled,
