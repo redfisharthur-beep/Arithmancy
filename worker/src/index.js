@@ -14,6 +14,13 @@ const CRIT_RATES={
 };
 const CRIT_MULTIPLIER=1.5;
 
+const TRAINING_ROOM_ID="AI-001";
+const TRAINING_BOTS=[
+  {id:"training-ai-mage",name:"Mika",classId:"mage",isBot:true},
+  {id:"training-ai-assassin",name:"Kai",classId:"assassin",isBot:true},
+  {id:"training-ai-priest",name:"Nora",classId:"priest",isBot:true}
+];
+
 const CLASS_NAMES={
   warrior:"戰士",mage:"法師",priest:"牧師",ranger:"弓手",assassin:"刺客",warlock:"術士"
 };
@@ -73,6 +80,7 @@ export class Room {
       const room={
         id:body.id,ownerId:body.playerId,owner:body.name,
         createdAt:Date.now(),updatedAt:Date.now(),started:false,max:6,
+        training:Boolean(body.training||body.id===TRAINING_ROOM_ID),
         players:[{id:body.playerId,name:String(body.name||"Player").slice(0,12),classId:body.classId||"warrior"}]
       };
       await this.saveRoom(room);await this.publish(room);
@@ -81,8 +89,22 @@ export class Room {
 
     if(request.method==="POST"&&url.pathname.endsWith("/join")){
       const body=await request.json();
-      const room=await this.getRoom();
+      let room=await this.getRoom();
+      if(room?.training&&room.started&&room.battle?.ended){
+        room={
+          id:room.id,
+          ownerId:body.playerId,
+          owner:String(body.name||"Player").slice(0,12),
+          createdAt:Date.now(),
+          updatedAt:Date.now(),
+          started:false,
+          max:6,
+          training:true,
+          players:[]
+        };
+      }
       if(!room||room.started)return Response.json({error:"ROOM_UNAVAILABLE"},{status:409});
+      room.training=Boolean(room.training||body.training||room.id===TRAINING_ROOM_ID);
       const existing=room.players.find(p=>p.id===body.playerId);
       if(!existing&&room.players.length>=room.max)return Response.json({error:"ROOM_FULL"},{status:409});
       if(existing){
@@ -121,9 +143,17 @@ export class Room {
       const body=await request.json();
       const room=await this.getRoom();
       if(!room||room.ownerId!==body.playerId)return Response.json({error:"NOT_HOST"},{status:403});
-      if(room.players.length<2||room.players.length>6)return Response.json({error:"PLAYER_COUNT"},{status:409});
+      const minPlayers=room.training?1:2;
+      if(room.players.length<minPlayers||room.players.length>6)return Response.json({error:"PLAYER_COUNT"},{status:409});
+
+      let battlePlayers=room.players.map(p=>({...p,isBot:false}));
+      if(room.training&&battlePlayers.length<4){
+        const needed=4-battlePlayers.length;
+        battlePlayers=[...battlePlayers,...TRAINING_BOTS.slice(0,needed)];
+      }
+
       room.started=true;room.updatedAt=Date.now();
-      room.battle=createBattle(room.players);
+      room.battle=createBattle(battlePlayers);
       await this.saveRoom(room);await this.publish(room);
       this.broadcast({type:"started",room});
       return Response.json({room});
@@ -204,7 +234,7 @@ export class Room {
     await lobby.fetch("https://lobby.internal/upsert",{
       method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({
-        id:room.id,owner:room.owner,players:room.players.length,max:room.max,
+        id:room.id,owner:room.owner,players:room.players.length,max:room.max,training:Boolean(room.training),
         createdAt:room.createdAt,updatedAt:room.updatedAt,started:room.started
       })
     });
@@ -240,7 +270,7 @@ function createBattle(roomPlayers){
   const battle={
     round:1,maxRounds:MAX_ROUNDS,phase:"question",ended:false,winnerId:null,
     players:roomPlayers.map(p=>({
-      id:p.id,name:p.name,classId:p.classId,hp:100,maxHp:100,guardCharges:0,effects:[],
+      id:p.id,name:p.name,classId:p.classId,isBot:Boolean(p.isBot),hp:100,maxHp:100,guardCharges:0,effects:[],
       damage:0,healing:0,ultimates:0,alive:true,submitted:false,submission:null
     })),
     cards:[],targets:[],solutions:{},roundStartedAt:0,roundEndsAt:0,
@@ -276,6 +306,30 @@ function prepareQuestion(battle){
   battle.roundStartedAt=Date.now();
   battle.roundEndsAt=battle.roundStartedAt+ROUND_SECONDS*1000;
   battle.players.filter(p=>p.alive).forEach(p=>{p.submitted=false;p.submission=null});
+  prepareTrainingBotSubmissions(battle);
+}
+
+function prepareTrainingBotSubmissions(battle){
+  const bots=battle.players.filter(p=>p.alive&&p.isBot);
+  for(const bot of bots){
+    const available=["ultimate","execute","attack","heal","guard"].filter(id=>{
+      if(id==="ultimate"&&(bot.ultimates||0)>=2)return false;
+      return Boolean(battle.solutions[id]);
+    });
+    const actionId=available[crypto.getRandomValues(new Uint32Array(1))[0]%available.length]||"attack";
+    const solution=battle.solutions[actionId]||battle.solutions.attack;
+    if(!solution)continue;
+    const secondBucket=7+(crypto.getRandomValues(new Uint32Array(1))[0]%32);
+    bot.submitted=true;
+    bot.submission={
+      formula:solution.formula,
+      result:solution.value,
+      actionId,
+      submittedAt:battle.roundStartedAt+secondBucket*1000,
+      secondBucket,
+      tieBreak:crypto.getRandomValues(new Uint32Array(1))[0]
+    };
+  }
 }
 
 function startNextRound(battle){
