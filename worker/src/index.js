@@ -390,7 +390,7 @@ function resolveRound(battle){
   else checkBattleEnd(battle);
 
   battle.phase="resolved";
-  battle.nextRoundAt=Date.now()+Math.max(5200,events.length*5200);
+  battle.nextRoundAt=Date.now()+Math.max(9200,events.length*9200);
 }
 
 function applyAction(battle,actor,action,critical=false){
