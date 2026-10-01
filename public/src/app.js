@@ -101,7 +101,7 @@ async function renderRooms(){
   const list=$("#roomList");
   list.innerHTML=`
     <div class="room-item ai-room">
-      <span><strong>${AI_ROOM.owner}</strong> · <span data-training-count>0/${AI_ROOM.max}</span></span>
+      <span><strong>${AI_ROOM.owner}</strong></span>
       <button data-ai-room>加入</button>
     </div>
     <div class="room-loading">讀取房間中...</div>`;
@@ -112,10 +112,6 @@ async function renderRooms(){
     const res=await fetch("/api/rooms",{cache:"no-store"});
     const data=await res.json();
     const rooms=(data.rooms||[]).filter(r=>!r.started);
-    const training=rooms.find(r=>r.id===AI_ROOM.id);
-    const count=list.querySelector("[data-training-count]");
-    if(count&&training)count.textContent=`${training.players}/${training.max}`;
-
     const humanHtml=rooms.filter(r=>r.id!==AI_ROOM.id).map(r=>`
       <div class="room-item">
         <span><strong>${escapeHtml(r.id)}</strong> · ${escapeHtml(r.owner)} · ${r.players}/${r.max}</span>
