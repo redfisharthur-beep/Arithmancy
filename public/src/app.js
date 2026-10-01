@@ -188,6 +188,17 @@ async function refreshHumanBattle(){
 
 async function syncHumanBattle(battle,initial=false){
   if(!battle)return;
+
+  // Keep the current event snapshot authoritative while animations are playing.
+  // Polling may already contain the fully resolved HP state; applying it here
+  // would make HP jump before the matching action/result is shown.
+  if(state.playingServerEvents){
+    state.round=battle.round;
+    state.roundEndsAt=battle.roundEndsAt||0;
+    state.targets=battle.targets||[];
+    return;
+  }
+
   state.round=battle.round;
   state.roundEndsAt=battle.roundEndsAt||0;
   state.targets=battle.targets||[];
@@ -951,9 +962,10 @@ function finalizeRoundWhenReady(force){
   if(!force&&alive.some(p=>!p.submitted))return;
   state.roundLocked=true;clearInterval(state.timerId);
   state.queue=alive.filter(p=>p.submission&&!p.submission.forfeit&&p.submission.action?.id!=="invalid").sort((a,b)=>{
-    const sa=Math.floor((a.submission.elapsed??ROUND_SECONDS));
-    const sb=Math.floor((b.submission.elapsed??ROUND_SECONDS));
-    return sa===sb?Math.random()-.5:sa-sb;
+    const ta=a.submission.at??Number.MAX_SAFE_INTEGER;
+    const tb=b.submission.at??Number.MAX_SAFE_INTEGER;
+    if(ta!==tb)return ta-tb;
+    return String(a.id).localeCompare(String(b.id));
   });
   resolveQueue();
 }
