@@ -341,9 +341,11 @@ function applyAction(battle,actor,action,critical=false){
     actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
   }
   if(action==="heal"){
-    if(actor.classId==="warrior")heal(actor,critAmount(scaled(BASE_HEAL,1.5),critical),actor);
-    else if(actor.classId==="priest")heal(actor,critAmount(scaled(BASE_HEAL,2),critical),actor);
-    else if(actor.classId==="warlock"){
+    if(actor.classId==="warrior"){
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.7),critical),sourceId:actor.id});
+    }else if(actor.classId==="priest"){
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,1.5),critical),sourceId:actor.id});
+    }else if(actor.classId==="warlock"){
       heal(actor,critAmount(scaled(BASE_HEAL,.8),critical),actor);
       addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
     }else heal(actor,critAmount(BASE_HEAL,critical),actor);
@@ -352,7 +354,11 @@ function applyAction(battle,actor,action,critical=false){
   if(action==="attack"){
     const target=highestHpEnemy(battle,actor);
     if(!target)return [];
-    const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
+    if(actor.classId==="mage"){
+      addEffect(target,{type:"dot",remaining:2,amount:critAmount(scaled(BASE_DAMAGE,.6),critical),sourceId:actor.id});
+      return [target.id];
+    }
+    const mult={warrior:1,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical));
     if(actor.classId==="warlock"&&target.alive){
       addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
@@ -381,7 +387,7 @@ function applyAction(battle,actor,action,critical=false){
       target.guardCharges=0;
       dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),{ignoreGuard:true});
     }else{
-      dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical));
     }
     return [target.id];
   }
