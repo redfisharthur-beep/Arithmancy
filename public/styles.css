@@ -435,44 +435,34 @@ button{color:inherit}
 }
 .paren-hint{display:none}
 .action-stage{
-  position:absolute;
-  inset:0;
-  z-index:5;
+  display:none;
+  width:100%;
+  margin:0;
+  pointer-events:none;
+}
+.action-stage.show{display:block}
+.action-card{
+  width:100%;
+  min-height:92px;
   display:flex;
   align-items:center;
   justify-content:center;
-  opacity:0;
-  pointer-events:none;
-  background:rgba(127,134,123,.96);
-  transition:.2s;
-}
-.action-stage.show{opacity:1}
-.action-card{
-  width:min(94%,500px);
-  min-height:150px;
-  display:grid;
-  grid-template-columns:118px minmax(0,1fr);
-  align-items:center;
-  gap:18px;
-  padding:16px 20px;
+  padding:14px 18px;
   border:1px solid rgba(72,78,72,.22);
-  border-radius:18px;
-  background:rgba(185,173,155,.88);
-}
-.action-class-image{
-  width:112px;
-  height:132px;
-  object-fit:contain;
-  object-position:center;
+  border-radius:0 0 14px 14px;
+  background:rgba(185,173,155,.92);
 }
 .action-result{
   min-width:0;
+  width:100%;
+  text-align:center;
   font-size:30px;
   line-height:1.45;
   font-weight:700;
   color:#fffaf2;
   display:flex;
   align-items:center;
+  justify-content:center;
   gap:10px;
   flex-wrap:wrap;
 }
@@ -482,7 +472,6 @@ button{color:inherit}
   object-fit:contain;
   flex:0 0 auto;
 }
-.action-stage img:not([src]){display:none}
 .battle-flash{position:absolute;inset:0;pointer-events:none;z-index:4}
 
 /* Bottom controls */
@@ -730,11 +719,7 @@ button{color:inherit}
     padding:12px;
     min-height:160px;
   }
-  .action-class-image{
-    width:90px;
-    height:126px;
-  }
-  .action-main-icon{
+    .action-main-icon{
     width:70px;
     height:70px;
   }
@@ -766,4 +751,15 @@ button{color:inherit}
 }
 .battle-shell.resolving-actions .formula-zone{
   min-height:220px;
+}
+
+.players-strip:has(+ .action-stage.show){
+  gap:7px;
+}
+.players-strip + .action-stage.show{
+  margin-top:-10px;
+}
+.players-strip + .action-stage.show .action-card{
+  border-top-left-radius:0;
+  border-top-right-radius:0;
 }
