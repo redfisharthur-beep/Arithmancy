@@ -534,7 +534,7 @@ button{color:inherit}
 }
 .rank-row{
   display:grid;
-  grid-template-columns:44px minmax(0,1.55fr) .7fr .7fr .7fr;
+  grid-template-columns:minmax(0,1.55fr) .7fr .7fr .7fr;
   gap:10px;
   align-items:center;
   min-height:108px;
@@ -543,9 +543,6 @@ button{color:inherit}
   border-radius:14px;
   font-size:18px;
   font-weight:600;
-}
-.rank-row>strong{
-  font-size:22px;
 }
 .rank-row:nth-child(4n+2){background:rgba(152,167,173,.46)}
 .rank-row:nth-child(4n+3){background:rgba(159,169,155,.46)}
@@ -561,11 +558,20 @@ button{color:inherit}
 }
 .rank-player{
   display:flex;
+  flex-direction:column;
   align-items:center;
-  gap:12px;
+  justify-content:center;
+  gap:8px;
   min-width:0;
   font-size:20px;
   font-weight:700;
+  text-align:center;
+}
+.rank-player-name{
+  display:block;
+  font-size:18px;
+  font-weight:700;
+  line-height:1.2;
 }
 .rank-avatar{
   width:88px;
@@ -644,15 +650,15 @@ button{color:inherit}
   .winner-logo{width:220px;max-height:112px}
   .winner strong{font-size:48px}
   .rank-row{
-    grid-template-columns:54px minmax(0,1.6fr) .7fr .7fr .7fr;
+    grid-template-columns:minmax(0,1.6fr) .7fr .7fr .7fr;
     min-height:136px;
     padding:16px 14px;
     gap:14px;
     font-size:24px;
   }
-  .rank-row>strong{font-size:28px}
   .rank-row.header{font-size:20px;min-height:auto}
-  .rank-player{gap:16px;font-size:26px}
+  .rank-player{gap:10px;font-size:26px}
+  .rank-player-name{font-size:22px}
   .rank-avatar{width:112px;height:112px}
   .formula-zone{min-height:310px}
   .battle-controls{
