@@ -15,6 +15,7 @@ const CRIT_RATES={
 const CRIT_MULTIPLIER=1.5;
 
 const TRAINING_ROOM_IDS=new Set(["TRAINING-01","TRAINING-02","TRAINING-03"]);
+const TRAINING_ROOM_TTL_MS=30*60*1000;
 const TRAINING_BOTS=[
   {id:"training-ai-mage",name:"Mika",classId:"mage",isBot:true},
   {id:"training-ai-assassin",name:"Kai",classId:"assassin",isBot:true},
@@ -69,6 +70,7 @@ export class Room {
 
     if(request.method==="GET"&&url.pathname.endsWith("/state")){
       let room=await this.getRoom();
+      room=await this.resetTrainingRoomIfExpired(room);
       if(room?.started&&room.battle){
         room=await this.advanceBattleIfNeeded(room);
       }
@@ -91,6 +93,7 @@ export class Room {
     if(request.method==="POST"&&url.pathname.endsWith("/join")){
       const body=await request.json();
       let room=await this.getRoom();
+      room=await this.resetTrainingRoomIfExpired(room);
       if(room?.training&&room.started&&room.battle?.ended){
         room={
           id:room.id,
@@ -108,6 +111,11 @@ export class Room {
       if(!room||room.started)return Response.json({error:"ROOM_UNAVAILABLE"},{status:409});
       room.training=Boolean(room.training||body.training||TRAINING_ROOM_IDS.has(room.id));
       if(body.trainingName)room.trainingName=String(body.trainingName).slice(0,12);
+      if(room.training&&room.players.length===0){
+        room.ownerId=body.playerId;
+        room.owner=String(body.name||"Player").slice(0,12);
+        room.createdAt=Date.now();
+      }
       const existing=room.players.find(p=>p.id===body.playerId);
       if(!existing&&room.players.length>=room.max)return Response.json({error:"ROOM_FULL"},{status:409});
       if(existing){
@@ -155,9 +163,14 @@ export class Room {
         battlePlayers=[...battlePlayers,...TRAINING_BOTS.slice(0,needed)];
       }
 
-      room.started=true;room.updatedAt=Date.now();
+      room.started=true;
+      room.startedAt=Date.now();
+      room.updatedAt=room.startedAt;
       room.battle=createBattle(battlePlayers);
       await this.saveRoom(room);await this.publish(room);
+      if(room.training){
+        try{await this.state.storage.setAlarm(room.startedAt+TRAINING_ROOM_TTL_MS)}catch{}
+      }
       this.broadcast({type:"started",room});
       return Response.json({room});
     }
@@ -203,6 +216,50 @@ export class Room {
     return new Response("Arithmancy room",{status:200});
   }
 
+  async resetTrainingRoom(room){
+    if(!room?.training)return room;
+    const reset={
+      id:room.id,
+      ownerId:null,
+      owner:"",
+      createdAt:Date.now(),
+      updatedAt:Date.now(),
+      started:false,
+      startedAt:null,
+      max:6,
+      training:true,
+      trainingName:room.trainingName||"",
+      players:[],
+      battle:null
+    };
+    await this.saveRoom(reset);
+    await this.publish(reset);
+    this.broadcast({type:"roomReset",room:reset});
+    try{await this.state.storage.deleteAlarm()}catch{}
+    return reset;
+  }
+
+  async resetTrainingRoomIfExpired(room){
+    if(!room?.training||!room.started)return room;
+    const startedAt=Number(room.startedAt||room.updatedAt||0);
+    if(!startedAt||Date.now()-startedAt<TRAINING_ROOM_TTL_MS)return room;
+    return this.resetTrainingRoom(room);
+  }
+
+  async alarm(){
+    const room=await this.getRoom();
+    if(room?.training&&room.started){
+      const startedAt=Number(room.startedAt||0);
+      if(startedAt&&Date.now()-startedAt>=TRAINING_ROOM_TTL_MS){
+        await this.resetTrainingRoom(room);
+        return;
+      }
+      if(startedAt){
+        try{await this.state.storage.setAlarm(startedAt+TRAINING_ROOM_TTL_MS)}catch{}
+      }
+    }
+  }
+
   async advanceBattleIfNeeded(room){
     const battle=room.battle;
     const now=Date.now();
@@ -238,7 +295,7 @@ export class Room {
       method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({
         id:room.id,owner:room.owner,players:room.players.length,max:room.max,training:Boolean(room.training),
-        createdAt:room.createdAt,updatedAt:room.updatedAt,started:room.started
+        createdAt:room.createdAt,updatedAt:room.updatedAt,started:room.started,startedAt:room.startedAt||null
       })
     });
   }
