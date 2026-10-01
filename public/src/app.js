@@ -180,7 +180,18 @@ async function refreshHumanBattle(){
   try{
     const res=await fetch(`/api/rooms/${encodeURIComponent(state.roomId)}/state`,{cache:"no-store"});
     const data=await res.json();
-    if(!data.room?.battle)return;
+    if(!data.room?.battle){
+      if(data.room?.training&&!data.room.started){
+        clearInterval(state.battlePoll);
+        clearInterval(state.timerId);
+        state.waitingRoom=null;
+        state.roomId=null;
+        state.isHost=false;
+        await renderRooms();
+        showScreen("lobby");
+      }
+      return;
+    }
     state.waitingRoom=data.room;
     await syncHumanBattle(data.room.battle,false);
   }catch{}
