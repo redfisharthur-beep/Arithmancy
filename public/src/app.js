@@ -448,7 +448,8 @@ async function hostStartFight(){
     state.waitingRoom=stateData.room;
     state.isHost=stateData.room.ownerId===state.clientId;
     if(!state.isHost)throw new Error("NOT_HOST");
-    if(stateData.room.players.length<2)throw new Error("PLAYER_COUNT");
+    const minPlayers=stateData.room.training?1:2;
+    if(stateData.room.players.length<minPlayers)throw new Error("PLAYER_COUNT");
 
     const res=await fetch(`/api/rooms/${encodeURIComponent(state.waitingRoom.id)}/start`,{
       method:"POST",
