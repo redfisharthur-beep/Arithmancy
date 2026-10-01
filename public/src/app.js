@@ -46,9 +46,9 @@ const ACTION_META={
 };
 
 const TRAINING_ROOMS=[
-  {id:"TRAINING-01",name:"演武堂",max:6},
-  {id:"TRAINING-02",name:"藏經閣",max:6},
-  {id:"TRAINING-03",name:"渡劫台",max:6}
+  {id:"TRAINING-01",name:"聚靈閣",max:6},
+  {id:"TRAINING-02",name:"洗髓池",max:6},
+  {id:"TRAINING-03",name:"破境殿",max:6}
 ];
 
 const AUDIO={
