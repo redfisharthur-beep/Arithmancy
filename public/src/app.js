@@ -326,7 +326,7 @@ function serverEventSummary(event,players,actionId,critical=false){
   const actor=players.find(p=>p.id===event.actorId);
   const actorName=actor?.name||"玩家";
   if(actionId==="heal"&&actor?.classId==="warrior"){
-    const amount=critAmount(scaled(BASE_HEAL,.7),critical);
+    const amount=critAmount(scaled(BASE_HEAL,.85),critical);
     return `${actorName}\n${amount} 持續恢復 2回合`;
   }
   if(actionId==="heal"&&actor?.classId==="priest"){
@@ -1060,12 +1060,12 @@ function applyAction(actor,submission,critical=false){
 
   if(action==="heal"){
     if(actor.classId==="warrior"){
-      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.7),critical),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,.85),critical),sourceId:actor.id});
     }else if(actor.classId==="priest"){
       addEffect(actor,{type:"hot",remaining:2,amount:critAmount(scaled(BASE_HEAL,1.5),critical),sourceId:actor.id});
     }else if(actor.classId==="warlock"){
       heal(actor,critAmount(scaled(BASE_HEAL,.8),critical));
-      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.6),sourceId:actor.id});
     }else heal(actor,critAmount(BASE_HEAL,critical));
     return;
   }
@@ -1077,10 +1077,10 @@ function applyAction(actor,submission,critical=false){
       addEffect(target,{type:"dot",remaining:2,amount:critAmount(scaled(BASE_DAMAGE,.6),critical),sourceId:actor.id});
       return;
     }
-    const mult={warrior:1,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
+    const mult={warrior:1.2,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical),actor.classId==="warlock"?"詛咒":"攻擊");
     if(actor.classId==="warlock"&&target.alive){
-      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
+      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.6),sourceId:actor.id});
     }
     return;
   }
@@ -1090,7 +1090,7 @@ function applyAction(actor,submission,critical=false){
       const enemies=state.players.filter(p=>p.alive&&p.id!==actor.id);
       const lowest=randomTiedLocal(enemies,p=>p.hp,"min");
       enemies.forEach(t=>{
-        const mult=t.id===lowest?.id?1.2:.6;
+        const mult=t.id===lowest?.id?1:.4;
         if((t.guardCharges||0)>0){
           t.guardCharges=0;
           dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),"尾刀",false,true);
@@ -1102,7 +1102,7 @@ function applyAction(actor,submission,critical=false){
     }
     const target=lowestHpEnemy(actor);
     if(!target)return;
-    const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
+    const mult={warrior:1.3,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
     if((target.guardCharges||0)>0){
       target.guardCharges=0;
       dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),"尾刀",true,true);
@@ -1134,7 +1134,7 @@ function applyUltimate(actor,critical=false){
 
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(actor);
-    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,3),critical),"穿心連矢",false);
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.7),critical),"穿心連矢",false);
     heal(actor,critAmount(scaled(BASE_HEAL,.5),critical));
     return;
   }
@@ -1143,7 +1143,7 @@ function applyUltimate(actor,critical=false){
     const target=lowestHpEnemy(actor);
     if(target){
       target.guardCharges=0;
-      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.5),critical),"暗影處決",false);
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.3),critical),"暗影處決",false);
     }
     return;
   }
@@ -1151,7 +1151,7 @@ function applyUltimate(actor,critical=false){
   if(actor.classId==="warlock"){
     const target=highestHpEnemy(actor);
     if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2),critical),"命運逆轉",false);
-    heal(actor,critAmount(scaled(BASE_HEAL,.7),critical));
+    heal(actor,critAmount(scaled(BASE_HEAL,.85),critical));
   }
 }
 
@@ -1253,7 +1253,7 @@ function showActionResult(actor,text,critical=false){
 }
 function buildEffectSummary(actor,action,before,critical=false,targets=[]){
   if(action==="heal"&&actor.classId==="warrior"){
-    const amount=critAmount(scaled(BASE_HEAL,.7),critical);
+    const amount=critAmount(scaled(BASE_HEAL,.85),critical);
     return `${actor.name}\n${amount} 持續恢復 2回合`;
   }
   if(action==="heal"&&actor.classId==="priest"){
