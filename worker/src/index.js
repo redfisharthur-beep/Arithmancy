@@ -14,7 +14,7 @@ const CRIT_RATES={
 };
 const CRIT_MULTIPLIER=1.5;
 
-const TRAINING_ROOM_ID="AI-001";
+const TRAINING_ROOM_IDS=new Set(["TRAINING-01","TRAINING-02","TRAINING-03"]);
 const TRAINING_BOTS=[
   {id:"training-ai-mage",name:"Mika",classId:"mage",isBot:true},
   {id:"training-ai-assassin",name:"Kai",classId:"assassin",isBot:true},
@@ -80,7 +80,8 @@ export class Room {
       const room={
         id:body.id,ownerId:body.playerId,owner:body.name,
         createdAt:Date.now(),updatedAt:Date.now(),started:false,max:6,
-        training:Boolean(body.training||body.id===TRAINING_ROOM_ID),
+        training:Boolean(body.training||TRAINING_ROOM_IDS.has(body.id)),
+        trainingName:String(body.trainingName||"").slice(0,12),
         players:[{id:body.playerId,name:String(body.name||"Player").slice(0,12),classId:body.classId||"warrior"}]
       };
       await this.saveRoom(room);await this.publish(room);
@@ -100,11 +101,13 @@ export class Room {
           started:false,
           max:6,
           training:true,
+          trainingName:String(body.trainingName||room.trainingName||"").slice(0,12),
           players:[]
         };
       }
       if(!room||room.started)return Response.json({error:"ROOM_UNAVAILABLE"},{status:409});
-      room.training=Boolean(room.training||body.training||room.id===TRAINING_ROOM_ID);
+      room.training=Boolean(room.training||body.training||TRAINING_ROOM_IDS.has(room.id));
+      if(body.trainingName)room.trainingName=String(body.trainingName).slice(0,12);
       const existing=room.players.find(p=>p.id===body.playerId);
       if(!existing&&room.players.length>=room.max)return Response.json({error:"ROOM_FULL"},{status:409});
       if(existing){
