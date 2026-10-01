@@ -4,6 +4,16 @@ const BASE_DAMAGE=24;
 const BASE_HEAL=22;
 const scaled=(base,m)=>Math.round(base*m);
 
+const CRIT_RATES={
+  warrior:.20,
+  mage:.25,
+  priest:.20,
+  ranger:.30,
+  assassin:.40,
+  warlock:.25
+};
+const CRIT_MULTIPLIER=1.5;
+
 const CLASS_NAMES={
   warrior:"戰士",mage:"法師",priest:"牧師",ranger:"弓手",assassin:"刺客",warlock:"術士"
 };
@@ -274,6 +284,16 @@ function startNextRound(battle){
   prepareQuestion(battle);
 }
 
+function rollCritical(actor,action){
+  if(action==="guard")return false;
+  const rate=CRIT_RATES[actor.classId]??.20;
+  const roll=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
+  return roll<rate;
+}
+function critAmount(amount,critical){
+  return critical?Math.round(amount*CRIT_MULTIPLIER):amount;
+}
+
 function resolveRound(battle){
   if(battle.phase!=="question")return;
   const now=Date.now();
@@ -297,10 +317,11 @@ function resolveRound(battle){
     const actor=queue[i];
     if(!actor.alive)continue;
     const before=snapshotPlayers(battle.players);
-    const targetIds=applyAction(battle,actor,actor.submission.actionId);
+    const critical=rollCritical(actor,actor.submission.actionId);
+    const targetIds=applyAction(battle,actor,actor.submission.actionId,critical);
     const after=snapshotPlayers(battle.players);
     events.push({
-      order:i+1,actorId:actor.id,actionId:actor.submission.actionId,targetIds,
+      order:i+1,actorId:actor.id,actionId:actor.submission.actionId,targetIds,critical,
       before,after,summary:buildSummary(actor,before,after)
     });
     if(checkBattleEnd(battle))break;
@@ -312,27 +333,27 @@ function resolveRound(battle){
   else checkBattleEnd(battle);
 
   battle.phase="resolved";
-  battle.nextRoundAt=Date.now()+Math.max(3500,events.length*1800);
+  battle.nextRoundAt=Date.now()+Math.max(5200,events.length*5200);
 }
 
-function applyAction(battle,actor,action){
+function applyAction(battle,actor,action,critical=false){
   if(action==="guard"){
     actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
   }
   if(action==="heal"){
-    if(actor.classId==="warrior")heal(actor,scaled(BASE_HEAL,1.5),actor);
-    else if(actor.classId==="priest")heal(actor,scaled(BASE_HEAL,2),actor);
+    if(actor.classId==="warrior")heal(actor,critAmount(scaled(BASE_HEAL,1.5),critical),actor);
+    else if(actor.classId==="priest")heal(actor,critAmount(scaled(BASE_HEAL,2),critical),actor);
     else if(actor.classId==="warlock"){
-      heal(actor,scaled(BASE_HEAL,.8),actor);
+      heal(actor,critAmount(scaled(BASE_HEAL,.8),critical),actor);
       addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
-    }else heal(actor,BASE_HEAL,actor);
+    }else heal(actor,critAmount(BASE_HEAL,critical),actor);
     return [actor.id];
   }
   if(action==="attack"){
     const target=highestHpEnemy(battle,actor);
     if(!target)return [];
     const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
-    dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
+    dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult),critical));
     if(actor.classId==="warlock"&&target.alive){
       addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
     }
@@ -346,9 +367,9 @@ function applyAction(battle,actor,action){
         const mult=t.id===lowest?.id?1.2:.6;
         if((t.guardCharges||0)>0){
           t.guardCharges=0;
-          dealDamage(actor,t,scaled(BASE_DAMAGE,mult*.5),{ignoreGuard:true});
+          dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),{ignoreGuard:true});
         }else{
-          dealDamage(actor,t,scaled(BASE_DAMAGE,mult));
+          dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,mult),critical));
         }
       }
       return enemies.map(p=>p.id);
@@ -358,7 +379,7 @@ function applyAction(battle,actor,action){
     const mult={warrior:1,priest:1,ranger:1.5,assassin:2,warlock:1.5,mage:1}[actor.classId]??1;
     if((target.guardCharges||0)>0){
       target.guardCharges=0;
-      dealDamage(actor,target,scaled(BASE_DAMAGE,mult*.5),{ignoreGuard:true});
+      dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,mult*.5),critical),{ignoreGuard:true});
     }else{
       dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
     }
@@ -367,37 +388,37 @@ function applyAction(battle,actor,action){
   if(action==="ultimate"){
     if((actor.ultimates||0)>=2)return [];
     actor.ultimates++;
-    return applyUltimate(battle,actor);
+    return applyUltimate(battle,actor,critical);
   }
   return [];
 }
 
-function applyUltimate(battle,actor){
+function applyUltimate(battle,actor,critical=false){
   const enemies=battle.players.filter(p=>p.alive&&p.id!==actor.id);
   if(actor.classId==="warrior"){actor.guardCharges=Math.min(2,(actor.guardCharges||0)+2);return [actor.id]}
   if(actor.classId==="mage"){
     const highest=randomTied(enemies,p=>p.hp,"max");
-    for(const t of enemies)dealDamage(actor,t,scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8));
+    for(const t of enemies)dealDamage(actor,t,critAmount(scaled(BASE_DAMAGE,t.id===highest?.id?1.4:.8),critical));
     return enemies.map(p=>p.id);
   }
   if(actor.classId==="priest"){
-    heal(actor,scaled(BASE_HEAL,2.5),actor);actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
+    heal(actor,critAmount(scaled(BASE_HEAL,2.5),critical),actor);actor.guardCharges=Math.min(2,(actor.guardCharges||0)+1);return [actor.id];
   }
   if(actor.classId==="ranger"){
     const target=lowestHpEnemy(battle,actor);
-    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,3));
-    heal(actor,scaled(BASE_HEAL,.5),actor);
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,3),critical));
+    heal(actor,critAmount(scaled(BASE_HEAL,.5),critical),actor);
     return [target?.id,actor.id].filter(Boolean);
   }
   if(actor.classId==="assassin"){
     const target=lowestHpEnemy(battle,actor);
-    if(target){target.guardCharges=0;dealDamage(actor,target,scaled(BASE_DAMAGE,2.5))}
+    if(target){target.guardCharges=0;dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2.5),critical))}
     return target?[target.id]:[];
   }
   if(actor.classId==="warlock"){
     const target=highestHpEnemy(battle,actor);
-    if(target)dealDamage(actor,target,scaled(BASE_DAMAGE,2));
-    heal(actor,scaled(BASE_HEAL,.7),actor);
+    if(target)dealDamage(actor,target,critAmount(scaled(BASE_DAMAGE,2),critical));
+    heal(actor,critAmount(scaled(BASE_HEAL,.7),critical),actor);
     return [target?.id,actor.id].filter(Boolean);
   }
   return [];
