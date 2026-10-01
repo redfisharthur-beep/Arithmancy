@@ -265,7 +265,7 @@ async function playServerEvents(battle){
       else if(diff>0)animateHeal(p.id,diff);
       if(p.guardCharges>prev.guardCharges)animateGuard(p.id);
     }
-    await wait(1350);
+    await wait(3000);
   }
 
   state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
@@ -489,15 +489,12 @@ function renderPlayers(){
   const strip=$("#playersStrip");
   const ids=new Set(state.players.map(p=>String(p.id)));
 
-  // Remove only players that actually disappeared. Reusing existing DOM nodes
-  // keeps avatar images decoded and prevents multiplayer polling from flashing.
   [...strip.querySelectorAll(".player-chip")].forEach(el=>{
     if(!ids.has(el.dataset.playerId))el.remove();
   });
 
   state.players.forEach(p=>{
     const id=String(p.id);
-    const hpPct=Math.max(0,p.hp/p.maxHp*100);
     let el=[...strip.children].find(node=>node.dataset?.playerId===id);
     if(!el){
       el=document.createElement("div");
@@ -505,12 +502,9 @@ function renderPlayers(){
       el.dataset.playerId=id;
       el.innerHTML=`
         <img class="player-avatar" alt="">
-        <div class="topline">
-          <span class="player-name"></span>
-          <span class="player-state"></span>
-          <span class="hp-value"></span>
-        </div>
-        <div class="hpbar"><i></i></div>`;
+        <span class="player-name"></span>
+        <span class="player-state" aria-label="狀態"></span>
+        <span class="hp-value"></span>`;
       strip.appendChild(el);
     }
 
@@ -520,9 +514,20 @@ function renderPlayers(){
     const src=`./assets/images/${CLASSES[p.classId]?.image||"warrior.png"}`;
     if(img.getAttribute("src")!==src)img.src=src;
     el.querySelector(".player-name").textContent=p.name;
-    el.querySelector(".player-state").textContent=p.guardCharges>0?"抵擋中":"";
+
+    const status=[];
+    for(let i=0;i<(p.guardCharges||0);i++){
+      status.push(`<img class="status-icon" src="./assets/images/withstand.png" alt="抵擋" title="抵擋">`);
+    }
+    for(const effect of p.effects||[]){
+      if(effect.type==="dot"){
+        status.push(`<img class="status-icon" src="./assets/images/curse.png" alt="持續傷害" title="持續傷害">`);
+      }else if(effect.type==="hot"){
+        status.push(`<img class="status-icon" src="./assets/images/Recover%20HP.png" alt="持續恢復" title="持續恢復">`);
+      }
+    }
+    el.querySelector(".player-state").innerHTML=status.join("");
     el.querySelector(".hp-value").textContent=Math.max(0,p.hp);
-    el.querySelector(".hpbar i").style.width=`${hpPct}%`;
     strip.appendChild(el);
   });
 }
@@ -885,7 +890,7 @@ async function performAnimatedAction(actor,submission,order){
     if(p.guardCharges>prev.guard)animateGuard(p.id);
   }
 
-  await wait(1350);
+  await wait(3000);
   document.querySelectorAll(".player-chip").forEach(el=>el.classList.remove("acting","targeted","buffing","hit","heal-pop","guard-pop"));
   await wait(250);
 }
@@ -1120,7 +1125,7 @@ async function showActionOverlay(actionId,classId){
   }
   overlay.classList.add("show");
   overlay.setAttribute("aria-hidden","false");
-  await wait(isUltimate?2000:1000);
+  await wait(2000);
   overlay.classList.remove("show");
   overlay.setAttribute("aria-hidden","true");
 }
