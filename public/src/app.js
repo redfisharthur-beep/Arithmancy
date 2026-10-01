@@ -175,7 +175,7 @@ async function syncHumanBattle(battle,initial=false){
   const me=state.players.find(p=>p.id===state.clientId);
   state.submitted=Boolean(me?.submitted);
   state.roundLocked=battle.phase!=="question";
-  $("#roundLabel").textContent=`Q${battle.round}/${battle.maxRounds||MAX_ROUNDS}`;
+  $("#roundLabel").textContent=`${battle.round}/${battle.maxRounds||MAX_ROUNDS}`;
   if(isNewRound)renderTargets();
   renderPlayers();
 
@@ -234,16 +234,12 @@ async function playServerEvents(battle){
   state.roundLocked=true;
   $("#submitBtn").disabled=true;
   $("#submitBtn").classList.add("submitted");
+  showActionStage();
 
   const events=battle.events||[];
   if(!events.length){
-    showActionStage();
-    $("#actionActor").textContent="";
-    $("#actionSkill").textContent="本題無人行動";
-    $("#actionTarget").textContent="";
-    $("#actionEffect").textContent="";
     $("#actionClassImage").removeAttribute("src");
-    $("#actionMainIcon").removeAttribute("src");
+    $("#actionEffect").textContent="本題無人行動";
     await wait(1200);
     hideActionStage();
   }
@@ -253,20 +249,14 @@ async function playServerEvents(battle){
     if(!actor)continue;
     const before=hydrateSnapshot(event.before||[],battle.players);
     const after=hydrateSnapshot(event.after||[],battle.players);
-    const targets=(event.targetIds||[]).map(id=>battle.players.find(p=>p.id===id)).filter(Boolean);
 
     state.players=before;
     renderPlayers();
-    if(event.actionId==="ultimate")await showUltimateOverlay(actor.classId);
-
-    const submission={action:{id:event.actionId,name:actionNameFor(actor,event.actionId)}};
-    showActionCard(actor,submission,targets,"");
-    await wait(400);
+    await showActionOverlay(event.actionId,actor.classId);
 
     state.players=after;
     renderPlayers();
-    const summary=serverEventSummary(event,battle.players);
-    showActionCard(actor,submission,targets,summary);
+    showActionResult(actor,serverEventSummary(event,battle.players,event.actionId));
 
     for(const p of after){
       const prev=before.find(x=>x.id===p.id);if(!prev)continue;
@@ -283,18 +273,26 @@ async function playServerEvents(battle){
   state.playingServerEvents=false;
 }
 
-function serverEventSummary(event,players){
+function serverEventSummary(event,players,actionId){
   const names=new Map(players.map(p=>[p.id,p.name]));
+  const actor=players.find(p=>p.id===event.actorId);
+  const actorName=actor?.name||"玩家";
   const parts=[];
   for(const a of event.after||[]){
     const b=(event.before||[]).find(x=>x.id===a.id);if(!b)continue;
-    const name=names.get(a.id)||"玩家";
-    if(a.hp<b.hp)parts.push(`${name} 傷害 ${b.hp-a.hp}`);
-    if(a.hp>b.hp)parts.push(`${name} 恢復 +${a.hp-b.hp}`);
-    if(a.guardCharges>b.guardCharges)parts.push(`${name} 抵擋 +${a.guardCharges-b.guardCharges}`);
-    if(a.guardCharges<b.guardCharges&&a.hp===b.hp)parts.push(`${name} 抵擋成功`);
+    const targetName=names.get(a.id)||"玩家";
+    if(a.hp<b.hp){
+      const suffix=actor?.classId==="warlock"&&actionId==="attack"?" 2回合":"";
+      parts.push(`${actorName} 造成 ${targetName} ${b.hp-a.hp} 傷害${suffix}`);
+    }
+    if(a.hp>b.hp){
+      const suffix=actor?.classId==="warlock"&&actionId==="heal"?" 2回合":"";
+      parts.push(`${actorName} 恢復 ${a.hp-b.hp}${suffix}`);
+    }
+    if(a.guardCharges>b.guardCharges)parts.push(`${actorName} 抵擋 +${a.guardCharges-b.guardCharges}`);
+    if(a.guardCharges<b.guardCharges&&a.hp===b.hp)parts.push(`${targetName} 抵擋成功`);
   }
-  return parts.join("｜")||"";
+  return parts.join("｜")||`${actorName} 行動完成`;
 }
 
 async function createHumanRoom(){
@@ -464,7 +462,7 @@ function beginRound(){
   $("#submitBtn").disabled=false;
   $("#submitBtn").classList.remove("submitted");
   $("#answerDisplay")?.classList.remove("submitted");
-  $("#roundLabel").textContent=`Q${state.round}/${MAX_ROUNDS}`;
+  $("#roundLabel").textContent=`${state.round}/${MAX_ROUNDS}`;
   renderTargets();renderPlayers();renderCards();updateFormula();renderLog();hideActionStage();
   startTimer();scheduleBots();
 }
@@ -849,11 +847,7 @@ async function resolveQueue(){
   if(!state.queue.length){
     showActionStage();
     $("#actionClassImage").removeAttribute("src");
-    $("#actionActor").textContent="";
-    $("#actionSkill").textContent="本題無人行動";
-    $("#actionTarget").textContent="";
-    $("#actionEffect").textContent="";
-    $("#actionMainIcon").removeAttribute("src");
+    $("#actionEffect").textContent="本題無人行動";
     await wait(1600);
   }
   for(let i=0;i<state.queue.length;i++){
@@ -872,20 +866,15 @@ async function performAnimatedAction(actor,submission,order){
   const targets=previewTargets(actor,action);
   actorEl?.classList.add("acting");
 
-  if(action==="ultimate"){
-    await showUltimateOverlay(actor.classId);
-  }
-
-  showActionCard(actor,submission,targets,`#${order}`);
+  await showActionOverlay(action,actor.classId);
   targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
-  await wait(450);
 
   const before=new Map(state.players.map(p=>[p.id,{hp:p.hp,guard:p.guardCharges}]));
   applyAction(actor,submission);
   renderPlayers();
 
   const effectText=buildEffectSummary(actor,action,before);
-  showActionCard(actor,submission,targets,effectText);
+  showActionResult(actor,effectText);
 
   for(const p of state.players){
     const prev=before.get(p.id);if(!prev)continue;
@@ -895,9 +884,9 @@ async function performAnimatedAction(actor,submission,order){
     if(p.guardCharges>prev.guard)animateGuard(p.id);
   }
 
-  await wait(1450);
+  await wait(1350);
   document.querySelectorAll(".player-chip").forEach(el=>el.classList.remove("acting","targeted","buffing","hit","heal-pop","guard-pop"));
-  await wait(300);
+  await wait(250);
 }
 
 function previewTargets(actor,action){
@@ -935,7 +924,7 @@ function applyAction(actor,submission){
     else if(actor.classId==="priest") heal(actor,scaled(BASE_HEAL,2));
     else if(actor.classId==="warlock"){
       heal(actor,scaled(BASE_HEAL,.8));
-      addEffect(actor,{type:"hot",remaining:1,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
     }else heal(actor,BASE_HEAL);
     return;
   }
@@ -946,7 +935,7 @@ function applyAction(actor,submission){
     const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,scaled(BASE_DAMAGE,mult),actor.classId==="warlock"?"詛咒":"攻擊");
     if(actor.classId==="warlock"&&target.alive){
-      addEffect(target,{type:"dot",remaining:1,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
+      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
     }
     return;
   }
@@ -1078,16 +1067,22 @@ function randomTiedLocal(list,getter,mode){
 }
 
 function playerEl(id){return document.querySelector(`[data-player-id="${id}"]`)}
-function showActionStage(){$("#actionStage").classList.add("show");$("#formulaZone").classList.add("resolving")}
-function hideActionStage(){$("#actionStage").classList.remove("show");$("#formulaZone").classList.remove("resolving")}
-function showActionCard(actor,submission,targets,effectText=""){
+function showActionStage(){
+  $("#actionStage").classList.add("show");
+  $("#formulaZone").classList.add("resolving");
+  $(".battle-shell")?.classList.add("resolving-actions");
+}
+function hideActionStage(){
+  $("#actionStage").classList.remove("show");
+  $("#formulaZone").classList.remove("resolving");
+  $(".battle-shell")?.classList.remove("resolving-actions");
+  $("#actionClassImage").removeAttribute("src");
+  $("#actionEffect").textContent="";
+}
+function showActionResult(actor,text){
   showActionStage();
   $("#actionClassImage").src=`./assets/images/${CLASSES[actor.classId].image}`;
-  $("#actionActor").textContent=actor.name;
-  $("#actionSkill").textContent=submission.action.name||ACTION_META[submission.action.id]?.label||"";
-  $("#actionMainIcon").src=`./assets/images/${ACTION_META[submission.action.id]?.image||"skill-attack.png"}`;
-  $("#actionTarget").textContent=targets.length?`對象：${targets.map(t=>t.name).join("、")}`:"";
-  $("#actionEffect").textContent=effectText;
+  $("#actionEffect").textContent=text||`${actor.name} 行動完成`;
 }
 function buildEffectSummary(actor,action,before){
   const parts=[];
@@ -1095,30 +1090,43 @@ function buildEffectSummary(actor,action,before){
     const prev=before.get(p.id);if(!prev)continue;
     const hpDiff=p.hp-prev.hp;
     const guardDiff=p.guardCharges-prev.guard;
-    if(hpDiff<0)parts.push(`${p.name} 傷害 ${-hpDiff}`);
-    if(hpDiff>0)parts.push(`${p.name} 恢復 +${hpDiff}`);
-    if(guardDiff>0)parts.push(`${p.name} 抵擋 +${guardDiff}`);
+    if(hpDiff<0){
+      const suffix=actor.classId==="warlock"&&action==="attack"?" 2回合":"";
+      parts.push(`${actor.name} 造成 ${p.name} ${-hpDiff} 傷害${suffix}`);
+    }
+    if(hpDiff>0){
+      const suffix=actor.classId==="warlock"&&action==="heal"?" 2回合":"";
+      parts.push(`${actor.name} 恢復 ${hpDiff}${suffix}`);
+    }
+    if(guardDiff>0)parts.push(`${actor.name} 抵擋 +${guardDiff}`);
     if(guardDiff<0&&hpDiff===0)parts.push(`${p.name} 抵擋成功`);
   }
-  if(actor.classId==="warlock"&&action==="attack")parts.push("詛咒持續 2 回合");
-  if(actor.classId==="warlock"&&action==="heal")parts.push("增益持續 2 回合");
-  return parts.join("｜")||ACTION_META[action]?.label||"";
+  return parts.join("｜")||`${actor.name} 行動完成`;
 }
-async function showUltimateOverlay(classId){
+async function showActionOverlay(actionId,classId){
   const overlay=$("#ultimateOverlay");
   const img=overlay.querySelector("img");
-  img.src=`./assets/images/ultimate-${classId}.png`;
-  img.alt=CLASSES[classId]?.ultimate||"絕招";
-  try{
-    AUDIO.ultimate.currentTime=0;
-    AUDIO.ultimate.play().catch(()=>{});
-  }catch{}
+  const isUltimate=actionId==="ultimate";
+  img.src=isUltimate
+    ?`./assets/images/ultimate-${classId}.png`
+    :`./assets/images/${ACTION_META[actionId]?.image||"skill-attack.png"}`;
+  img.alt=isUltimate?(CLASSES[classId]?.ultimate||"絕招"):(ACTION_META[actionId]?.label||"行動");
+  if(isUltimate){
+    try{
+      AUDIO.ultimate.currentTime=0;
+      AUDIO.ultimate.play().catch(()=>{});
+    }catch{}
+  }
   overlay.classList.add("show");
   overlay.setAttribute("aria-hidden","false");
-  await wait(2000);
+  await wait(isUltimate?2000:1000);
   overlay.classList.remove("show");
   overlay.setAttribute("aria-hidden","true");
 }
+async function showUltimateOverlay(classId){
+  await showActionOverlay("ultimate",classId);
+}
+
 function animateHit(id,amount){const el=playerEl(id);el?.classList.add("hit");floatText(el,`-${amount}`,"damage")}
 function animateHeal(id,amount){const el=playerEl(id);el?.classList.add("heal-pop");floatText(el,`+${amount}`,"heal")}
 function animateGuard(id){const el=playerEl(id);el?.classList.add("guard-pop");floatText(el,"BLOCK","guard")}
