@@ -264,10 +264,11 @@ async function playServerEvents(battle){
   state.roundLocked=true;
   $("#submitBtn").disabled=true;
   $("#submitBtn").classList.add("submitted");
-  showActionStage();
+  beginActionSequence();
 
   const events=battle.events||[];
   if(!events.length){
+    showActionStage();
     $("#actionEffect").textContent="本題無人行動";
     await wait(1200);
     hideActionStage();
@@ -281,6 +282,10 @@ async function playServerEvents(battle){
 
     state.players=before;
     renderPlayers();
+    const actorEl=playerEl(actor.id);
+    actorEl?.classList.add("acting");
+    await wait(2000);
+
     await showActionOverlay(event.actionId,actor.classId);
 
     state.players=after;
@@ -294,7 +299,10 @@ async function playServerEvents(battle){
       else if(diff>0)animateHeal(p.id,diff);
       if(p.guardCharges>prev.guardCharges)animateGuard(p.id);
     }
-    await wait(3000);
+    await wait(4000);
+    document.querySelectorAll(".player-chip").forEach(el=>el.classList.remove("acting","targeted","buffing","hit","heal-pop","guard-pop"));
+    $("#actionStage").classList.remove("show");
+    $("#actionEffect").textContent="";
   }
 
   state.players=(battle.players||[]).map(p=>({...p,isHuman:p.id===state.clientId,effects:p.effects||[]}));
@@ -308,16 +316,16 @@ function serverEventSummary(event,players,actionId,critical=false){
   const actorName=actor?.name||"玩家";
   if(actionId==="heal"&&actor?.classId==="warrior"){
     const amount=critAmount(scaled(BASE_HEAL,.7),critical);
-    return `${actorName} 恢復 ${amount} 2回合`;
+    return `${actorName}\n${amount} 持續恢復 2回合`;
   }
   if(actionId==="heal"&&actor?.classId==="priest"){
     const amount=critAmount(scaled(BASE_HEAL,1.5),critical);
-    return `${actorName} 恢復 ${amount} 2回合`;
+    return `${actorName}\n${amount} 持續恢復 2回合`;
   }
   if(actionId==="attack"&&actor?.classId==="mage"){
     const targetName=names.get(event.targetIds?.[0])||"目標";
     const amount=critAmount(scaled(BASE_DAMAGE,.6),critical);
-    return `${actorName} 造成 ${targetName} ${amount} ${critical?"爆擊傷害":"傷害"} 2回合`;
+    return `${actorName} 造成 ${targetName}\n${amount} ${critical?"爆擊持續傷害":"持續傷害"} 2回合`;
   }
   const parts=[];
   for(const a of event.after||[]){
@@ -325,11 +333,11 @@ function serverEventSummary(event,players,actionId,critical=false){
     const targetName=names.get(a.id)||"玩家";
     if(a.hp<b.hp){
       const suffix=actor?.classId==="warlock"&&actionId==="attack"?" 2回合":"";
-      parts.push(`${actorName} 造成 ${targetName} ${b.hp-a.hp} ${critical?"爆擊傷害":"傷害"}${suffix}`);
+      parts.push(`${actorName} 造成 ${targetName}\n${b.hp-a.hp} ${critical?"爆擊傷害":"傷害"}${suffix}`);
     }
     if(a.hp>b.hp){
       const suffix=actor?.classId==="warlock"&&actionId==="heal"?" 2回合":"";
-      parts.push(`${actorName} 恢復 ${a.hp-b.hp}${suffix}`);
+      parts.push(`${actorName}\n恢復 ${a.hp-b.hp}${suffix}`);
     }
     if(a.guardCharges>b.guardCharges)parts.push(`${actorName} 抵擋 +${a.guardCharges-b.guardCharges}`);
     if(a.guardCharges<b.guardCharges&&a.hp===b.hp)parts.push(`${targetName} 抵擋成功`);
@@ -972,6 +980,7 @@ async function performAnimatedAction(actor,submission,order){
   const actorEl=playerEl(actor.id);
   const targets=previewTargets(actor,action);
   actorEl?.classList.add("acting");
+  await wait(2000);
 
   await showActionOverlay(action,actor.classId);
   targets.forEach(t=>playerEl(t.id)?.classList.add(action==="heal"||action==="guard"?"buffing":"targeted"));
@@ -992,8 +1001,10 @@ async function performAnimatedAction(actor,submission,order){
     if(p.guardCharges>prev.guard)animateGuard(p.id);
   }
 
-  await wait(3000);
+  await wait(4000);
   document.querySelectorAll(".player-chip").forEach(el=>el.classList.remove("acting","targeted","buffing","hit","heal-pop","guard-pop"));
+  $("#actionStage").classList.remove("show");
+  $("#actionEffect").textContent="";
   await wait(250);
 }
 
@@ -1202,6 +1213,11 @@ function randomTiedLocal(list,getter,mode){
 }
 
 function playerEl(id){return document.querySelector(`[data-player-id="${id}"]`)}
+function beginActionSequence(){
+  $("#actionStage").classList.remove("show");
+  $("#actionEffect").textContent="";
+  $(".battle-shell")?.classList.add("resolving-actions");
+}
 function showActionStage(){
   $("#actionStage").classList.add("show");
   $(".battle-shell")?.classList.add("resolving-actions");
@@ -1226,16 +1242,16 @@ function showActionResult(actor,text,critical=false){
 function buildEffectSummary(actor,action,before,critical=false,targets=[]){
   if(action==="heal"&&actor.classId==="warrior"){
     const amount=critAmount(scaled(BASE_HEAL,.7),critical);
-    return `${actor.name} 恢復 ${amount} 2回合`;
+    return `${actor.name}\n${amount} 持續恢復 2回合`;
   }
   if(action==="heal"&&actor.classId==="priest"){
     const amount=critAmount(scaled(BASE_HEAL,1.5),critical);
-    return `${actor.name} 恢復 ${amount} 2回合`;
+    return `${actor.name}\n${amount} 持續恢復 2回合`;
   }
   if(action==="attack"&&actor.classId==="mage"){
     const target=targets[0];
     const amount=critAmount(scaled(BASE_DAMAGE,.6),critical);
-    return `${actor.name} 造成 ${target?.name||"目標"} ${amount} ${critical?"爆擊傷害":"傷害"} 2回合`;
+    return `${actor.name} 造成 ${target?.name||"目標"}\n${amount} ${critical?"爆擊持續傷害":"持續傷害"} 2回合`;
   }
   const parts=[];
   for(const p of state.players){
@@ -1244,11 +1260,11 @@ function buildEffectSummary(actor,action,before,critical=false,targets=[]){
     const guardDiff=p.guardCharges-prev.guard;
     if(hpDiff<0){
       const suffix=actor.classId==="warlock"&&action==="attack"?" 2回合":"";
-      parts.push(`${actor.name} 造成 ${p.name} ${-hpDiff} ${critical?"爆擊傷害":"傷害"}${suffix}`);
+      parts.push(`${actor.name} 造成 ${p.name}\n${-hpDiff} ${critical?"爆擊傷害":"傷害"}${suffix}`);
     }
     if(hpDiff>0){
       const suffix=actor.classId==="warlock"&&action==="heal"?" 2回合":"";
-      parts.push(`${actor.name} 恢復 ${hpDiff}${suffix}`);
+      parts.push(`${actor.name}\n恢復 ${hpDiff}${suffix}`);
     }
     if(guardDiff>0)parts.push(`${actor.name} 抵擋 +${guardDiff}`);
     if(guardDiff<0&&hpDiff===0)parts.push(`${p.name} 抵擋成功`);
@@ -1292,7 +1308,7 @@ async function showActionOverlay(actionId,classId){
 
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden","false");
-    await wait(2000);
+    await wait(3000);
     overlay.classList.remove("show");
     overlay.setAttribute("aria-hidden","true");
     img.removeAttribute("src");
