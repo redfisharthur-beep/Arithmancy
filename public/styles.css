@@ -698,7 +698,7 @@ button{color:inherit}
   display:flex;
   align-items:center;
   justify-content:center;
-  background:rgba(54,58,53,.96);
+  background:#363a35;
   opacity:0;
   visibility:hidden;
   pointer-events:none;
@@ -713,22 +713,6 @@ button{color:inherit}
   height:min(82vh,760px);
   object-fit:contain;
   filter:drop-shadow(0 18px 36px rgba(0,0,0,.28));
-}
-
-@media(max-width:430px){
-  .action-card{
-    grid-template-columns:92px minmax(0,1fr) 72px;
-    gap:10px;
-    padding:12px;
-    min-height:160px;
-  }
-    .action-main-icon{
-    width:70px;
-    height:70px;
-  }
-  .action-copy span{font-size:18px}
-  .action-copy strong{font-size:20px}
-  #actionEffect{font-size:14px}
 }
 
 @media(min-width:1024px){
