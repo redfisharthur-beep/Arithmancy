@@ -324,7 +324,7 @@ function applyAction(battle,actor,action){
     else if(actor.classId==="priest")heal(actor,scaled(BASE_HEAL,2),actor);
     else if(actor.classId==="warlock"){
       heal(actor,scaled(BASE_HEAL,.8),actor);
-      addEffect(actor,{type:"hot",remaining:1,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
+      addEffect(actor,{type:"hot",remaining:2,amount:scaled(BASE_HEAL,.8),sourceId:actor.id});
     }else heal(actor,BASE_HEAL,actor);
     return [actor.id];
   }
@@ -334,7 +334,7 @@ function applyAction(battle,actor,action){
     const mult={warrior:1,mage:.7,priest:1,ranger:1.5,assassin:1.5,warlock:.8}[actor.classId]??1;
     dealDamage(actor,target,scaled(BASE_DAMAGE,mult));
     if(actor.classId==="warlock"&&target.alive){
-      addEffect(target,{type:"dot",remaining:1,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
+      addEffect(target,{type:"dot",remaining:2,amount:scaled(BASE_DAMAGE,.8),sourceId:actor.id});
     }
     return [target.id];
   }
