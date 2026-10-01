@@ -1145,7 +1145,7 @@ function showResults(){
   });
   $("#winnerName").textContent=rows[0]?.name||"";
   $("#ranking").innerHTML=`
-    <div class="rank-row header"><span>#</span><span>玩家</span><span>傷害</span><span>恢復</span><span>絕招</span></div>
+    <div class="rank-row header"><span aria-hidden="true"></span><span aria-hidden="true"></span><span>傷害</span><span>恢復</span><span>絕招</span></div>
     ${rows.map((r,i)=>`<div class="rank-row"><strong>${i+1}</strong><span class="rank-player"><img class="rank-avatar" src="./assets/images/${CLASSES[r.classId].image}" alt=""><span>${r.name}</span></span><span>${r.damage}</span><span>${r.healing}</span><span>${r.ultimates}</span></div>`).join("")}`;
   showScreen("results");
 }
